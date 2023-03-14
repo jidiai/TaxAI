@@ -4,16 +4,20 @@ from abc import ABC, abstractmethod
 class BaseEntity(ABC):
     name=""
     type=None
-    def __init__(self, n_agent):
+    # def __init__(self, n_agent):
+    #     assert self.name
+    #
+    #     self.n_agent = n_agent
+
+    def __init__(self):
         assert self.name
 
-        self.n_agent = n_agent
 
     def reset(self):
         pass
 
     @abstractmethod
-    def get_obs(self):
+    def get_obs(self, otherAgents):
         pass
 
     @abstractmethod
@@ -21,7 +25,7 @@ class BaseEntity(ABC):
         pass
 
     @abstractmethod
-    def entity_step(self):
+    def entity_step(self, action):
         pass
 
 
