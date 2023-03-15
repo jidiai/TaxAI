@@ -28,13 +28,20 @@ if __name__ == '__main__':
     # wealth = env.households.initial_wealth_distribution(100000)
     # print(env.households.gini_coef(wealth))
     # env.households.lorenz_curve(wealth)
+    env.reset()
+    done = False
 
-    env.households.get_obs(env)
-    env.households.entity_step()
-    env.MarketClear()
-    env.government.get_obs(env)
+    while not done:
+        action = {env.agent_selection: None}
+        obs, r, done, next_agent_name, _ = env.step(action)
 
-    env.government.entity_step()
+
+    # env.households.get_obs(env)
+    # env.households.entity_step()
+    # env.MarketClear()
+    # env.government.get_obs(env)
+    #
+    # env.government.entity_step()
 
 
 

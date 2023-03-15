@@ -7,18 +7,11 @@ import math
 import random
 import quantecon as qe
 import matplotlib.pyplot as plt
-import torch
 
 from gym.spaces import Box
 
 class Household(BaseEntity):
     name='Household'
-
-    #def __init__(self, **entity_args):
-    '''
-        带 ** 指调用该函数时有不固定的输入，所有的参数被zip成一个dict, 但是调用时要写清楚 Household(num=?, wage=?,rate=?),num,wage,rate是key
-        P = custom_cfg.get('p', False)  如果调用时key有p，P就是传进去的值，如果没有，P=False
-    '''
 
     def __init__(self, entity_args):
         super().__init__()
@@ -37,7 +30,6 @@ class Household(BaseEntity):
         # self.ep_index = entity_args.initial_e                                 #ep_0, initial abilities
         # self.e = self.e_transition(self.ep_index)
 
-        self.env = None
         self.e = self.e_distribution()
         self.asset = self.initial_wealth_distribution()
         self.next_asset = None   # 为了将二者区分开来
@@ -55,7 +47,8 @@ class Household(BaseEntity):
         # todo 待修改与research papers对齐
         # 目前建模成人的能力是一个正态分布 智商在 normal(100，15)
         e0 = np.random.normal(loc=1, scale=0.15, size=self.n_households)
-        return torch.tensor(e0).unsqueeze(1)
+        return e0
+        # return torch.tensor(e0).unsqueeze(1)
 
     def e_transition(self, old_ep_index):
         '''
@@ -84,11 +77,18 @@ class Household(BaseEntity):
 
     def get_obs(self, env):
         #{W_t, e_t, r_t-1, a_t, tau_t-1, xi_t-1, tau_{a, t-1}, xi_{a,t-1}, G_t-1}
-        self.env = env
-        single_obs = torch.tensor([env.WageRate, env.RentRate, env.government.tau, env.government.xi, env.government.tau_a, env.government.xi_a, env.government.G])
-        multi_obs = single_obs.repeat(self.n_households, 1)
+        single_obs = np.array([env.WageRate,
+                               env.RentRate,
+                               env.government.tau,
+                               env.government.xi,
+                               env.government.tau_a,
+                               env.government.xi_a,
+                               env.government.G])
 
-        multi_obs = torch.cat((self.e, self.asset, multi_obs),1)
+        multi_obs = np.repeat(single_obs[np.newaxis, ...], self.n_households, axis=0)
+        multi_obs = np.concatenate((self.e[...,np.newaxis], self.asset, multi_obs), -1)
+        # multi_obs = single_obs.repeat(self.n_households, 1)
+        # multi_obs = np.concatenate((self.e, self.asset, multi_obs),1)
 
         # todo 该格式怎么用？
         rets = {
@@ -124,19 +124,19 @@ class Household(BaseEntity):
         #if controllable, overwritten by the agent module
         pass
 
-    def entity_step(self, multi_actions=None):
+    def entity_step(self, env, multi_actions=None):
         '''
         multi_actions = np.array([[p1,h1], [p2,h2],...,[pN, hN]]) (100 * 2)
         e.g.
         '''
         multi_actions = np.random.random(size=(100, 2))
 
-        saving_p = torch.tensor(multi_actions[:, 0]).unsqueeze(1)
-        self.workingHours = torch.tensor(multi_actions[:, 1]).unsqueeze(1)
+        saving_p = np.array(multi_actions[:, 0])[:,np.newaxis,...]
+        self.workingHours = np.array(multi_actions[:, 1])[:,np.newaxis,...]
 
-        self.income = self.env.WageRate * self.e * self.workingHours + self.env.RentRate * self.asset
-        income_tax = self.env.government.tax_function(self.env.government.tau, self.env.government.xi, self.income)
-        asset_tax = self.env.government.tax_function(self.env.government.tau, self.env.government.xi_a, self.asset)
+        self.income = env.WageRate * self.e * self.workingHours + env.RentRate * self.asset
+        income_tax = env.government.tax_function(env.government.tau, env.government.xi, self.income)
+        asset_tax = env.government.tax_function(env.government.tau, env.government.xi_a, self.asset)
         current_total_wealth = self.income - income_tax + self.asset - asset_tax + self.transfer
 
         # compute tax
@@ -150,14 +150,14 @@ class Household(BaseEntity):
         terminated = bool(self.gini_coef(self.next_asset) > 0.8)
 
         self.asset = copy.copy(self.next_asset)
-        self.state = self.get_obs(self.env)
+        self.state = self.get_obs(env)
         return np.array(self.state, dtype=np.float32), self.reward, terminated
 
     def utility_function(self, c_t, h_t):
         # life-time CRRA utility
         if 1-self.CRRA == 0 or 1 + self.IFE == 0:
             print("Assignment error of CRRA or IFE!")
-        current_utility = torch.pow(c_t, 1-self.CRRA)/(1-self.CRRA) - torch.pow(h_t, 1 + self.IFE)/(1 + self.IFE)
+        current_utility = c_t**(1-self.CRRA)/(1-self.CRRA) - h_t**(1 + self.IFE)/(1 + self.IFE)
         return current_utility
 
     def gini_coef(self, wealths):
@@ -193,7 +193,7 @@ class Household(BaseEntity):
 
         y = pareto(x)
 
-        return torch.tensor(y).unsqueeze(1)
+        return np.array(y)[:,np.newaxis, ...]
 
 
     def render(self):

@@ -33,6 +33,18 @@ class economic_society(BaseEntity):
         self.tau_a = 0.02
         self.xi_a = 0
         self.G = 0
+        self.Kt = 0
+
+        self.possible_agents = ['households', 'government']
+        self.episode_years = 100
+        self.year_per_step = 1
+        self.episode_length = self.episode_years/self.year_per_step
+        self.step_cnt = 0
+        self.agent_selection_idx = 0
+
+    @property
+    def agent_selection(self):
+        return self.possible_agents[self.agent_selection_idx]
 
 
 
@@ -48,6 +60,62 @@ class economic_society(BaseEntity):
     def reset(self, **custom_cfg):
         self.households.reset()
         self.government.reset()
+        self.done = False
+
+    def step(self, action_dict):
+        self.valid_action_dict = self.is_valid(action_dict)
+        obs = self.run()
+
+        self.step_cnt += 1
+
+        self.done = self.is_terminal()
+        reward = 0
+        print(f'step {self.step_cnt}')
+
+        return obs, reward, self.done, self.agent_selection, ""
+
+
+
+
+    def run(self):
+        """
+        run a year
+        """
+        ################# entity step  ############################
+        # for agent_name in self.possible_agents:                 #this take step in turns
+        for agent_name, agent_action in self.valid_action_dict.items():
+            _state, _reward, _done = getattr(getattr(self, agent_name), 'entity_step')(self, agent_action)  # entity step
+            if _done:
+                self.done = _done
+                break               #break the for loop if done??
+        ################## after each entity have taken actions, proceed an environment step ##########################3
+
+        #TODO: global state change
+
+
+        ##################### get obs ################################3
+        self.agent_selection_idx = (self.agent_selection_idx+1)%len(self.possible_agents)
+
+        rets = {}
+        next_agent_name = self.agent_selection
+
+        rets[next_agent_name] = getattr(getattr(self, next_agent_name), 'get_obs')(self)
+
+        return rets
+
+
+    def is_valid(self, action_dict):
+        return action_dict
+
+    def is_terminal(self):
+        if self.done:           #household/government termination
+            return self.done
+
+
+        if self.step_cnt >= self.episode_length:
+            return True
+        else:
+            return False
 
 
     def get_obs(self):
