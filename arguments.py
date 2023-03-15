@@ -44,7 +44,7 @@ def get_args():
     parse.add_argument('--delta', type=float, default=0.05, help='depreciation rate')
     parse.add_argument('--captial_rental_rate', type=float, default=0.04, help='captial_rental_rate')
     parse.add_argument('--lump_sum_transfer', type=float, default=0.0001, help='lump sum transfer')
-    parse.add_argument('--initial_e', type=float, default=int(1e6), help='e_0, initial abilities')
+    parse.add_argument('--initial_e', type=float, default=int(1), help='e_0, initial abilities')
     parse.add_argument('--initial_debt', type=float, default=1.0, help='the intial government debt')  # todo?
     parse.add_argument('--initial_wealth', type=float, default=1.0, help='the initial wealth distribution')  # todo????
     parse.add_argument('--n_households', type=int, default=100, help='the number of total households')

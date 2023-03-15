@@ -25,12 +25,29 @@ if __name__ == '__main__':
 
     # todo test
     env = economic_society(args)
+    # wealth = env.households.initial_wealth_distribution(100000)
+    # print(env.households.gini_coef(wealth))
+    # env.households.lorenz_curve(wealth)
+    env.reset()
+    done = False
 
-    print(env.households.e_transition(1))
+    while not done:
+        action = {env.agent_selection: None}
+        obs, r, done, next_agent_name, _ = env.step(action)
 
-    # todo trainer 包括 government + N households
-    trainer = agent(env, args)
-    # start to learn
-    trainer.learn()
-    # close the environment
-    env.close()
+
+    # env.households.get_obs(env)
+    # env.households.entity_step()
+    # env.MarketClear()
+    # env.government.get_obs(env)
+    #
+    # env.government.entity_step()
+
+
+
+    # # todo trainer 包括 government + N households
+    # trainer = agent(env, args)
+    # # start to learn
+    # trainer.learn()
+    # # close the environment
+    # env.close()
