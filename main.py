@@ -14,28 +14,24 @@ if __name__ == '__main__':
     args = get_args()
     set_seeds(args)
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.device_num)
-    # todo start to create the environment
-    #
-    # if args.env_type == 'atari':
-    #     envs = create_multiple_envs(args)
-    # elif args.env_type == 'mujoco':
-    #     envs = create_single_env(args)
-    # else:
-    #     raise NotImplementedError
 
-    # todo test
     env = economic_society(args)
-    # wealth = env.households.initial_wealth_distribution(100000)
-    # print(env.households.gini_coef(wealth))
-    # env.households.lorenz_curve(wealth)
+    env.reset()
+    done = False
+    next_agent_name = 'government'
+    action_value = None
+    step = 0
 
-    env.households.get_obs(env)
-    env.households.entity_step()
-    env.MarketClear()
-    env.government.get_obs(env)
+    while not done:
+        if env.agent_selection == 'households':
+            action_value = np.random.random(size=(5, 2))
+        elif env.agent_selection == 'government':
+            action_value = np.random.random(size=(5,))
 
-    env.government.entity_step()
-
+        action = {env.agent_selection: action_value}
+        obs, r, done, next_agent_name, _ = env.step(action)  # o^{-i}_{t+1}, r^i_t(s,a), agent_name^{-i}
+        print("step ",step, "reward:", r, "--done: ", done, "--next agent: ", next_agent_name)
+        step += 1
 
 
     # # todo trainer 包括 government + N households

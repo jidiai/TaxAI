@@ -47,7 +47,7 @@ def get_args():
     parse.add_argument('--initial_e', type=float, default=int(1), help='e_0, initial abilities')
     parse.add_argument('--initial_debt', type=float, default=1.0, help='the intial government debt')  # todo?
     parse.add_argument('--initial_wealth', type=float, default=1.0, help='the initial wealth distribution')  # todo????
-    parse.add_argument('--n_households', type=int, default=100, help='the number of total households')
+    parse.add_argument('--n_households', type=int, default=5, help='the number of total households')
 
 
 

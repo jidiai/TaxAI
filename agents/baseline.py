@@ -87,4 +87,30 @@ class agent:
 
 
     def learn(self):
+        # for loop
+
+        # government sample
+
+        # save data into replay buffer
+
+        # households sample
+        # save data into replay buffer  # 提前初始化两个buffer
+
+        # update
+
+        # print
+        # save rewards+steps +loss，  visualization
+
+
+
+        pass
+
+    def update(self):
+        # sample batch
+
+        # compute policy Q
+
+        # compute loss
+
+        # loss gradient
         pass
