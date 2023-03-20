@@ -3,6 +3,7 @@ from utils.episode import EpisodeKey
 import math
 import copy
 import numpy as np
+from gym.spaces import Box
 
 class Government(BaseEntity):
     name='government'
@@ -19,6 +20,12 @@ class Government(BaseEntity):
         # self.env = None
         self.debt = 0
         self.next_debt = None
+        self.observation_space = Box(
+            low=-np.inf, high=np.inf, shape=(6,), dtype=np.float32
+        )
+        self.action_space = Box(
+            low=-1, high=1, shape=(5,), dtype=np.float32
+        )
 
 
     def reset(self, **custom_cfg):
@@ -30,21 +37,44 @@ class Government(BaseEntity):
         self.G = 0
 
         self.debt = 0
+        return np.array([
+                       self.tau,
+                       self.xi,
+                       self.tau_a,
+                       self.xi_a,
+                       self.G])
 
-    def get_obs(self, env):
+
+    # def get_obs(self):
+    #     # [income_mean, income_std, asset_mean, asset_std, K_{t-1}]
+    #
+    #     income = env.households.income
+    #     asset = env.households.asset
+    #     self.income_mean = np.mean(income)
+    #     self.income_std = np.std(income)
+    #
+    #     self.asset_mean = np.mean(asset)
+    #     self.asset_std = np.std(asset)
+    #
+    #     obs = np.array([self.income_mean, self.income_std, self.asset_mean, self.asset_std, env.Kt])
+    #
+    #     return obs
+    def get_obs(self):
+        pass
+
+    def obs_transfer(self, income, asset):
         # [income_mean, income_std, asset_mean, asset_std, K_{t-1}]
 
-        income = env.households.income
-        asset = env.households.asset
         self.income_mean = np.mean(income)
         self.income_std = np.std(income)
 
         self.asset_mean = np.mean(asset)
         self.asset_std = np.std(asset)
 
-        obs = np.array([self.income_mean, self.income_std, self.asset_mean, self.asset_std, env.Kt])
+        obs = np.array([self.income_mean, self.income_std, self.asset_mean, self.asset_std])
 
         return obs
+
 
 
 
@@ -59,19 +89,24 @@ class Government(BaseEntity):
         # action = np.array([0.5, 0.2, 0.02, 0, 1])
         # next state
         self.tau, self.xi, self.tau_a, self.xi_a, self.G = action
-        self.sum_tax = sum(env.households.tax_array)
+        self.sum_tax = sum(env.households_tax)
         self.next_debt = (1 + env.RentRate) * self.debt + self.G - self.sum_tax  # B_{t+1}
 
-        self.state = self.get_obs(env)
-
-        self.reward = (env.households.reward).sum()
+        # self.state = self.get_obs(env)
+        #
+        # self.reward = (env.households.reward).sum()
         self.debt = copy.copy(self.next_debt)
-        return np.array(self.state, dtype=np.float32), self.reward, None # government 的terminal 与households一样
+        # return np.array(self.state, dtype=np.float32), self.reward, None # government 的terminal 与households一样
 
 
-    def tax_function(self, tau, xi, x):
+    def tax_function(self, income, asset):
         # x: input
-        return x - (1 - tau)/(1-xi) * np.power(x, 1-xi)     #torch.pow(x, 1-xi)
+        def tax_f(x, tau, xi):
+            return x - (1 - tau)/(1-xi) * np.power(x, 1-xi)
+
+        income_tax = tax_f(income, self.tau, self.xi)
+        asset_tax = tax_f(asset, self.tau_a, self.xi_a)
+        return income_tax + asset_tax
 
 
 

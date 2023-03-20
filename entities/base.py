@@ -17,7 +17,7 @@ class BaseEntity(ABC):
         pass
 
     @abstractmethod
-    def get_obs(self, otherAgents):
+    def get_obs(self):
         pass
 
     @abstractmethod

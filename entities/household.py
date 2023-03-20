@@ -31,15 +31,17 @@ class Household(BaseEntity):
         # self.e = self.e_transition(self.ep_index)
 
         self.e = self.e_distribution()
+        self.income = self.e * 1  # assume that income is proportional to e
         self.asset = self.initial_wealth_distribution()
         self.next_asset = None   # 为了将二者区分开来
+
 
         # space
         self.action_space = Box(
             low=-1, high=1, shape=(2,), dtype=np.float32  # todo low and high?
         )
         self.observation_space = Box(
-            low=-np.inf, high=np.inf, shape=(9,), dtype=np.float32
+            low=-np.inf, high=np.inf, shape=(13,), dtype=np.float32   # torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)
         )
 
 
@@ -72,37 +74,41 @@ class Household(BaseEntity):
 
     def reset(self, **custom_cfg):
         self.e = self.e_distribution()
+        self.income = self.e * 1
         self.asset = self.initial_wealth_distribution()
+        obs = self.get_obs()
+
+        return obs
 
 
-    def get_obs(self, env):
+    def get_obs(self):
         #{W_t, e_t, r_t-1, a_t, tau_t-1, xi_t-1, tau_{a, t-1}, xi_{a,t-1}, G_t-1}
-        single_obs = np.array([env.WageRate,
-                               env.RentRate,
-                               env.government.tau,
-                               env.government.xi,
-                               env.government.tau_a,
-                               env.government.xi_a,
-                               env.government.G])
+        # single_obs = np.array([env.WageRate,
+        #                        env.RentRate,
+        #                        env.government.tau,
+        #                        env.government.xi,
+        #                        env.government.tau_a,
+        #                        env.government.xi_a,
+        #                        env.government.G])
+        #
+        # multi_obs = np.repeat(single_obs[np.newaxis, ...], self.n_households, axis=0)
+        # multi_obs = np.concatenate((self.e, self.asset, multi_obs), -1)
 
-        multi_obs = np.repeat(single_obs[np.newaxis, ...], self.n_households, axis=0)
-        multi_obs = np.concatenate((self.e, self.asset, multi_obs), -1)
+        # # todo 该格式怎么用？
+        # rets = {
+        #     EpisodeKey.WageRate: env.WageRate,
+        #     EpisodeKey.Ability: self.e,
+        #     EpisodeKey.SavingReturn: env.RentRate,
+        #     EpisodeKey.Asset: self.asset,
+        #     EpisodeKey.IncomeTax: env.government.tau,
+        #     EpisodeKey.IncomeTaxSlope: env.government.xi,
+        #     EpisodeKey.WealthTax: env.government.tau_a,
+        #     EpisodeKey.WealthTaxSlope: env.government.xi_a,
+        #     EpisodeKey.GovernmentSpending: env.government.G,
+        #
+        # }
 
-        # todo 该格式怎么用？
-        rets = {
-            EpisodeKey.WageRate: env.WageRate,
-            EpisodeKey.Ability: self.e,
-            EpisodeKey.SavingReturn: env.RentRate,
-            EpisodeKey.Asset: self.asset,
-            EpisodeKey.IncomeTax: env.government.tau,
-            EpisodeKey.IncomeTaxSlope: env.government.xi,
-            EpisodeKey.WealthTax: env.government.tau_a,
-            EpisodeKey.WealthTaxSlope: env.government.xi_a,
-            EpisodeKey.GovernmentSpending: env.government.G,
-
-        }
-
-        return multi_obs
+        return np.concatenate((self.e, self.asset), -1)
 
     def get_actions(self):
         #if controllable, overwritten by the agent module
@@ -135,7 +141,7 @@ class Household(BaseEntity):
 
         self.asset = copy.copy(self.next_asset)
         self.state = self.get_obs(env)
-        return np.array(self.state, dtype=np.float32), self.reward, terminated
+        return self.reward, terminated
 
     def utility_function(self, c_t, h_t):
         # life-time CRRA utility

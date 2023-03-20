@@ -22,21 +22,21 @@ if __name__ == '__main__':
     action_value = None
     step = 0
 
-    while not done:
-        if env.agent_selection == 'households':
-            action_value = np.random.random(size=(5, 2))
-        elif env.agent_selection == 'government':
-            action_value = np.random.random(size=(5,))
-
-        action = {env.agent_selection: action_value}
-        obs, r, done, next_agent_name, _ = env.step(action)  # o^{-i}_{t+1}, r^i_t(s,a), agent_name^{-i}
-        print("step ",step, "reward:", r, "--done: ", done, "--next agent: ", next_agent_name)
-        step += 1
+    # while not done:
+    #     if env.agent_selection == 'households':
+    #         action_value = np.random.random(size=(5, 2))
+    #     elif env.agent_selection == 'government':
+    #         action_value = np.random.random(size=(5,))
+    #
+    #     action = {env.agent_selection: action_value}
+    #     obs, r, done, next_agent_name, _ = env.step(action)  # o^{-i}_{t+1}, r^i_t(s,a), agent_name^{-i}
+    #     print("step ",step, "reward:", r, "--done: ", done, "--next agent: ", next_agent_name)
+    #     step += 1
 
 
     # # todo trainer 包括 government + N households
-    # trainer = agent(env, args)
-    # # start to learn
-    # trainer.learn()
+    trainer = agent(env, args)
+    # start to learn
+    trainer._initial_exploration()
     # # close the environment
     # env.close()
