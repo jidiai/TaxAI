@@ -3,3 +3,4 @@ math
 random
 gym
 quantecon
+omegaconf
