@@ -5,11 +5,13 @@ from agents.baseline import agent
 from utils.seeds import set_seeds
 from arguments import get_args
 import os
-
+import torch
+os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
+torch.cuda.is_available()
 if __name__ == '__main__':
     # set signle thread
-    # os.environ['OMP_NUM_THREADS'] = '1'
-    # os.environ['MKL_NUM_THREADS'] = '1'
+    os.environ['OMP_NUM_THREADS'] = '1'
+    os.environ['MKL_NUM_THREADS'] = '1'
     # get arguments
     args = get_args()
     set_seeds(args)
@@ -37,6 +39,6 @@ if __name__ == '__main__':
     # # todo trainer 包括 government + N households
     trainer = agent(env, args)
     # start to learn
-    trainer._initial_exploration()
+    trainer.learn()
     # # close the environment
     # env.close()

@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch.distributions.normal import Normal
 from torch.distributions import Distribution
+from torch.nn import functional as F
 
 """
 the tanhnormal distributions from rlkit may not stable
@@ -73,7 +74,7 @@ class get_action_info:
                 actions = self.dist.sample()
         else:
             actions = torch.tanh(self.mean)
-        return actions
+        return F.softmax(actions, dim=1)
 
     def get_log_prob(self, actions, pre_tanh_value):
         log_prob = self.dist.log_prob(actions, pre_tanh_value=pre_tanh_value)

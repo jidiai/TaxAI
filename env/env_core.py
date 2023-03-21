@@ -76,7 +76,7 @@ class economic_society(BaseEntity):
         self.step_cnt += 1
         self.done = self.is_terminal()
 
-        return next_global_state, next_private_state, sum(households_utility), households_utility
+        return next_global_state, next_private_state, sum(households_utility), households_utility, self.done
 
 
     # def step(self, action_dict):

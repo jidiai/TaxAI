@@ -50,10 +50,14 @@ class SharedAgent(nn.Module):
         self.log_std_max = log_std_max
         self.num_agent = num_agent
 
-    def forward(self, global_state, private_state, gov_action):
+    def forward(self, global_state, private_state, gov_action, update=False):
+        if update == True:
+            global_state = global_state.unsqueeze(1)
+            gov_action = gov_action.unsqueeze(1)
+
         n_global_obs = global_state.repeat(1, self.num_agent, 1)
         n_gov_action = gov_action.repeat(1, self.num_agent, 1)
-        inputs = torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)  # 维度待修改
+        inputs = torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)
         out = self.fc1(inputs)
         out = self.gru(out)
         out = self.fc2(out)
@@ -80,14 +84,22 @@ class Critic(nn.Module):
         return output
 
 class SharedCritic(nn.Module):   # Q(s, a_g, a_h, \bar{a_h})
-    def __init__(self, state_dim, gov_action_dim, hou_action_dim, hidden_size):
+    def __init__(self, state_dim, hou_action_dim, hidden_size, num_agent):
         super(SharedCritic, self).__init__()
-        self.fc1 = nn.Linear(state_dim + gov_action_dim + hou_action_dim*2, hidden_size)
+        self.fc1 = nn.Linear(state_dim + hou_action_dim, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.q_value = nn.Linear(hidden_size, 1)
+        self.num_agent = num_agent
 
-    def forward(self, obs, gov_action, hou_action, mean_hou_action):
-        inputs = torch.cat([obs, gov_action, hou_action, mean_hou_action], dim=1)
+    def forward(self, global_state, private_state, gov_action, hou_action):
+
+        global_state = global_state.unsqueeze(1)
+        gov_action = gov_action.unsqueeze(1)
+
+        n_global_obs = global_state.repeat(1, self.num_agent, 1)
+        n_gov_action = gov_action.repeat(1, self.num_agent, 1)
+
+        inputs = torch.cat([n_global_obs, private_state, n_gov_action, hou_action], dim=-1)  # 修改维度
         x = F.relu(self.fc1(inputs))
         x = F.relu(self.fc2(x))
         output = self.q_value(x)

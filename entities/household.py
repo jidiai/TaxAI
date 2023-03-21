@@ -24,7 +24,7 @@ class Household(BaseEntity):
         self.CRRA = entity_args.CRRA                                    #theta
         self.IFE = entity_args.IFE                                      #inverse Frisch Elasticity
         self.eta = 0                                                    # if eta=0, the transitory shocks are additive, if eta = 1, they are multiplicative
-        self.beta = entity_args.beta                                    #discount factor
+        # self.beta = entity_args.beta                                    #discount factor
         self.transfer = entity_args.lump_sum_transfer
         # todo N households 初始化 e0, wealth0 ??? 看文献
         # self.ep_index = entity_args.initial_e                                 #ep_0, initial abilities
@@ -125,12 +125,11 @@ class Household(BaseEntity):
         self.workingHours = np.array(multi_actions[:, 1])[:,np.newaxis,...]
 
         self.income = env.WageRate * self.e * self.workingHours + env.RentRate * self.asset
-        income_tax = env.government.tax_function(env.government.tau, env.government.xi, self.income)
-        asset_tax = env.government.tax_function(env.government.tau, env.government.xi_a, self.asset)
-        current_total_wealth = self.income - income_tax + self.asset - asset_tax + self.transfer
+        tax = env.government.tax_function(self.income, self.asset)
+        current_total_wealth = self.income + self.asset - tax + self.transfer
 
         # compute tax
-        self.tax_array = income_tax + asset_tax - self.transfer  # N households tax array
+        self.tax_array = tax - self.transfer  # N households tax array
 
         self.next_asset = saving_p * current_total_wealth
         current_consumption = (1 - saving_p) * current_total_wealth
@@ -140,7 +139,7 @@ class Household(BaseEntity):
         terminated = bool(self.gini_coef(self.next_asset) > 0.8)
 
         self.asset = copy.copy(self.next_asset)
-        self.state = self.get_obs(env)
+        # self.state = self.get_obs()
         return self.reward, terminated
 
     def utility_function(self, c_t, h_t):
