@@ -25,15 +25,6 @@ class economic_society(BaseEntity):
         self.WageRate = 1
         self.RentRate = 0.04
 
-        # government information
-        # self.tau = 0.5
-        # self.xi = 0.2
-        # self.tau_a = 0.02
-        # self.xi_a = 0
-        # self.G = 0
-
-        # self.Kt = 0
-
         self.possible_agents = ['government', 'households']
         self.episode_years = 100
         self.year_per_step = 1
@@ -126,7 +117,6 @@ class economic_society(BaseEntity):
         if self.done:           #household/government termination
             return self.done
 
-
         if self.step_cnt >= self.episode_length:
             return True
         else:
@@ -143,7 +133,6 @@ class economic_society(BaseEntity):
         self.asset_mean = np.mean(asset)
         self.asset_std = np.std(asset)
 
-        # gov_obs = np.array([self.income_mean, self.income_std, self.asset_mean, self.asset_std, self.Kt])
         global_obs = np.array([self.income_mean, self.income_std, self.asset_mean, self.asset_std, self.WageRate, self.RentRate])
         private_obs = self.households.get_obs()
 

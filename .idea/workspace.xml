@@ -201,7 +201,7 @@
       <option name="presentableId" value="Default" />
       <updated>1678969008314</updated>
       <workItem from="1678969010000" duration="176000" />
-      <workItem from="1678969272507" duration="39466000" />
+      <workItem from="1678969272507" duration="39566000" />
     </task>
     <servers />
   </component>
@@ -213,12 +213,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/entities/household.py</url>
-          <line>94</line>
-          <option name="timeStamp" value="19" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/entities/household.py</url>
-          <line>141</line>
+          <line>115</line>
           <option name="timeStamp" value="20" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">

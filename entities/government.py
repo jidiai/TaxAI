@@ -76,8 +76,6 @@ class Government(BaseEntity):
         return obs
 
 
-
-
     def get_actions(self):
         #if controllable, overwritten by the agent module
         pass
@@ -91,13 +89,7 @@ class Government(BaseEntity):
         self.tau, self.xi, self.tau_a, self.xi_a, self.G = action
         self.sum_tax = sum(env.households_tax)
         self.next_debt = (1 + env.RentRate) * self.debt + self.G - self.sum_tax  # B_{t+1}  # debt 可以为负，买卖国债
-
-        # self.state = self.get_obs(env)
-        #
-        # self.reward = (env.households.reward).sum()
         self.debt = copy.copy(self.next_debt)
-        # return np.array(self.state, dtype=np.float32), self.reward, None # government 的terminal 与households一样
-
 
     def tax_function(self, income, asset):
         # x: input

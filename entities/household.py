@@ -82,32 +82,6 @@ class Household(BaseEntity):
 
 
     def get_obs(self):
-        #{W_t, e_t, r_t-1, a_t, tau_t-1, xi_t-1, tau_{a, t-1}, xi_{a,t-1}, G_t-1}
-        # single_obs = np.array([env.WageRate,
-        #                        env.RentRate,
-        #                        env.government.tau,
-        #                        env.government.xi,
-        #                        env.government.tau_a,
-        #                        env.government.xi_a,
-        #                        env.government.G])
-        #
-        # multi_obs = np.repeat(single_obs[np.newaxis, ...], self.n_households, axis=0)
-        # multi_obs = np.concatenate((self.e, self.asset, multi_obs), -1)
-
-        # # todo 该格式怎么用？
-        # rets = {
-        #     EpisodeKey.WageRate: env.WageRate,
-        #     EpisodeKey.Ability: self.e,
-        #     EpisodeKey.SavingReturn: env.RentRate,
-        #     EpisodeKey.Asset: self.asset,
-        #     EpisodeKey.IncomeTax: env.government.tau,
-        #     EpisodeKey.IncomeTaxSlope: env.government.xi,
-        #     EpisodeKey.WealthTax: env.government.tau_a,
-        #     EpisodeKey.WealthTaxSlope: env.government.xi_a,
-        #     EpisodeKey.GovernmentSpending: env.government.G,
-        #
-        # }
-
         return np.concatenate((self.e, self.asset), -1)
 
     def get_actions(self):
