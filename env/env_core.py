@@ -5,29 +5,35 @@ import numpy as np
 import math
 import torch
 
-class economic_society(BaseEntity):
-    name = "Ramsey"
+class economic_society:
+    name = "wealth distribution economic society"
     '''
     decision:
         government
         market clear
         households
     '''
-    def __init__(self, entity_args):
+    def __init__(self, cfg):
         super().__init__()
-        self.households = Household(entity_args)
-        self.government = Government(entity_args)
+
+        for entity_arg in cfg['Entities']:
+            if entity_arg['entity_name'] == 'household':
+                self.households = Household(entity_arg['entity_args'])
+            elif entity_arg['entity_name'] == 'government':
+                self.government = Government(entity_arg['entity_args'])
+
+        env_args = cfg['env_core']['env_args']
         self.screen = None  # for rendering
-        self.alpha = entity_args.alpha
+        self.alpha = eval(env_args['alpha'])
 
         # market
         # todo 后面根据市场均衡计算
-        self.WageRate = 1
-        self.RentRate = 0.04
+        self.WageRate = env_args['WageRate']
+        self.RentRate = env_args['RentRate']
 
-        self.possible_agents = ['government', 'households']
-        self.episode_years = 100
-        self.year_per_step = 1
+        self.possible_agents = cfg['env_core']['possible_agents']  #['government', 'households']
+        self.episode_years = env_args['episode_years']
+        self.year_per_step = env_args['year_per_step']
         self.episode_length = self.episode_years/self.year_per_step
         self.step_cnt = 0
         self.agent_selection_idx = 0
@@ -68,10 +74,7 @@ class economic_society(BaseEntity):
         self.done = self.is_terminal()
 
         return next_global_state, next_private_state, np.mean(households_utility, axis=0), households_utility, self.done
-<<<<<<< Updated upstream
-=======
 
->>>>>>> Stashed changes
 
     def is_valid(self, action_dict):
         return action_dict

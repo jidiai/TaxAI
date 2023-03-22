@@ -15,17 +15,17 @@ class Household(BaseEntity):
 
     def __init__(self, entity_args):
         super().__init__()
-        self.n_households = entity_args.n_households
+        self.n_households = entity_args['n']
         # max action
-        self.consumption_range = entity_args.consumption_range          #action range
-        self.working_hours_range = entity_args.working_hours_range
+        self.consumption_range = entity_args['consumption_range']          #action range
+        self.working_hours_range = entity_args['working_hours_range']
 
         # fixed hyperparameter
-        self.CRRA = entity_args.CRRA                                    #theta
-        self.IFE = entity_args.IFE                                      #inverse Frisch Elasticity
-        self.eta = 0                                                    # if eta=0, the transitory shocks are additive, if eta = 1, they are multiplicative
+        self.CRRA = entity_args['CRRA']                                    #theta
+        self.IFE = entity_args['IFE']                                      #inverse Frisch Elasticity
+        self.eta = entity_args['eta']                                                    # if eta=0, the transitory shocks are additive, if eta = 1, they are multiplicative
         # self.beta = entity_args.beta                                    #discount factor
-        self.transfer = entity_args.lump_sum_transfer
+        self.transfer = entity_args['lump_sum_transfer']
         # todo N households 初始化 e0, wealth0 ??? 看文献
         # self.ep_index = entity_args.initial_e                                 #ep_0, initial abilities
         # self.e = self.e_transition(self.ep_index)
@@ -35,17 +35,15 @@ class Household(BaseEntity):
         self.asset = self.initial_wealth_distribution()
         self.next_asset = None   # 为了将二者区分开来
         self.gini = 0
-<<<<<<< Updated upstream
 
-=======
->>>>>>> Stashed changes
-
+        action_dim = entity_args['action_shape']
+        obs_dim = entity_args['observation_shape']
         # space
         self.action_space = Box(
-            low=-1, high=1, shape=(2,), dtype=np.float32  # todo low and high?
+            low=-1, high=1, shape=(action_dim,), dtype=np.float32  # todo low and high?
         )
         self.observation_space = Box(
-            low=-np.inf, high=np.inf, shape=(13,), dtype=np.float32   # torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)
+            low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32   # torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)
         )
 
 
@@ -99,8 +97,10 @@ class Household(BaseEntity):
         e.g.
         multi_actions = np.random.random(size=(100, 2))
         '''
+        # multi_actions = np.random.random(size=(100, 2))
+
         saving_p = np.array(multi_actions[:, 0])[:,np.newaxis,...]
-        self.workingHours = np.array(multi_actions[:, 1])[:,np.newaxis,...]    # for scale
+        self.workingHours = np.array(multi_actions[:, 1])[:,np.newaxis,...]
 
         self.income = env.WageRate * self.e * self.workingHours + env.RentRate * self.asset
         tax = env.government.tax_function(self.income, self.asset)
@@ -126,7 +126,6 @@ class Household(BaseEntity):
         if 1-self.CRRA == 0 or 1 + self.IFE == 0:
             print("Assignment error of CRRA or IFE!")
         current_utility = c_t**(1-self.CRRA)/(1-self.CRRA) - h_t**(1 + self.IFE)/(1 + self.IFE)
-
         return current_utility
 
     def gini_coef(self, wealths):

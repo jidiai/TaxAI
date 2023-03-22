@@ -1,5 +1,5 @@
 # AI-TaxingPolicy
 
 ```bash
-python main.py --cuda
+python main.py --cinfig "n100"
 ```

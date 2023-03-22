@@ -6,9 +6,6 @@ from utils.seeds import set_seeds
 from arguments import get_args
 import os
 import torch
-<<<<<<< Updated upstream
-# os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
-=======
 import yaml
 import argparse
 from omegaconf import OmegaConf
@@ -19,20 +16,11 @@ def parse_args():
     parser.add_argument("--config", type=str, default='default')
     args = parser.parse_args()
     return args
->>>>>>> Stashed changes
 
 if __name__ == '__main__':
     # set signle thread
     os.environ['OMP_NUM_THREADS'] = '1'
     os.environ['MKL_NUM_THREADS'] = '1'
-<<<<<<< Updated upstream
-    # get arguments
-    args = get_args()
-    set_seeds(args)
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.device_num)
-
-    env = economic_society(args)
-=======
 
     args = parse_args()
     path = args.config
@@ -40,7 +28,6 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = str(yaml_cfg.device_num)
 
     env = economic_society(yaml_cfg.Environment)
->>>>>>> Stashed changes
     env.reset()
     done = False
     next_agent_name = 'government'
@@ -48,25 +35,24 @@ if __name__ == '__main__':
     step = 0
 
     # while not done:
-    #     if env.agent_selection == 'households':
-    #         action_value = np.random.random(size=(5, 2))
-    #     elif env.agent_selection == 'government':
-    #         action_value = np.random.random(size=(5,))
+        # if env.agent_selection == 'households':
+        #     action_value = np.random.random(size=(5, 2))
+        # elif env.agent_selection == 'government':
+        #     action_value = np.random.random(size=(5,))
     #
-    #     action = {env.agent_selection: action_value}
-    #     obs, r, done, next_agent_name, _ = env.step(action)  # o^{-i}_{t+1}, r^i_t(s,a), agent_name^{-i}
-    #     print("step ",step, "reward:", r, "--done: ", done, "--next agent: ", next_agent_name)
-    #     step += 1
+        # action = {env.agent_selection: action_value}
+        # action = {'Household': np.random.random(size=(5, 2)),
+        #           'government': np.random.random(size=(5,))}
+        # global_obs, private_obs, sum_r, r,done = env.step(action)  # o^{-i}_{t+1}, r^i_t(s,a), agent_name^{-i}
+        # print("step ",step, "reward:", r, "--done: ", done, "--next agent: ", next_agent_name)
+        # step += 1
+        # print(f'step {step}')
 
 
     # # todo trainer 包括 government + N households
-    trainer = agent(env, args)
+    trainer = agent(env, yaml_cfg.Trainer)
     # start to learn
-<<<<<<< Updated upstream
-    print("n_households:", args.n_households)
-=======
     print("n_households: ", yaml_cfg.Trainer["n_households"])
->>>>>>> Stashed changes
     trainer.learn()
     # # close the environment
     # env.close()
