@@ -68,6 +68,10 @@ class economic_society(BaseEntity):
         self.done = self.is_terminal()
 
         return next_global_state, next_private_state, np.mean(households_utility, axis=0), households_utility, self.done
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 
     def is_valid(self, action_dict):
         return action_dict

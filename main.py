@@ -6,18 +6,41 @@ from utils.seeds import set_seeds
 from arguments import get_args
 import os
 import torch
+<<<<<<< Updated upstream
 # os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
+=======
+import yaml
+import argparse
+from omegaconf import OmegaConf
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default='default')
+    args = parser.parse_args()
+    return args
+>>>>>>> Stashed changes
 
 if __name__ == '__main__':
     # set signle thread
     os.environ['OMP_NUM_THREADS'] = '1'
     os.environ['MKL_NUM_THREADS'] = '1'
+<<<<<<< Updated upstream
     # get arguments
     args = get_args()
     set_seeds(args)
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.device_num)
 
     env = economic_society(args)
+=======
+
+    args = parse_args()
+    path = args.config
+    yaml_cfg = OmegaConf.load(f'./cfg/{path}.yaml')
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(yaml_cfg.device_num)
+
+    env = economic_society(yaml_cfg.Environment)
+>>>>>>> Stashed changes
     env.reset()
     done = False
     next_agent_name = 'government'
@@ -39,7 +62,11 @@ if __name__ == '__main__':
     # # todo trainer 包括 government + N households
     trainer = agent(env, args)
     # start to learn
+<<<<<<< Updated upstream
     print("n_households:", args.n_households)
+=======
+    print("n_households: ", yaml_cfg.Trainer["n_households"])
+>>>>>>> Stashed changes
     trainer.learn()
     # # close the environment
     # env.close()

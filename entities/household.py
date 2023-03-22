@@ -35,7 +35,10 @@ class Household(BaseEntity):
         self.asset = self.initial_wealth_distribution()
         self.next_asset = None   # 为了将二者区分开来
         self.gini = 0
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 
         # space
         self.action_space = Box(

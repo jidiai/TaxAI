@@ -126,8 +126,12 @@ class agent:
                 epochs.append(now_step)
                 np.savetxt(str(self.model_path) + "/steps.txt", epochs)
 
+<<<<<<< Updated upstream
                 logger.add_scalar('Government/mean_episode_rewards', mean_rewards, now_step)
                 logger.add_scalar('mean households utility', mean_rewards/self.args.n_households, now_step)
+=======
+                logger.add_scalar('Government/mean households utility', mean_rewards, now_step)
+>>>>>>> Stashed changes
                 logger.add_scalar('Gini coef', self.envs.households.gini, now_step)
                 logger.add_scalar('government actor loss', gov_actor_loss, now_step)
                 logger.add_scalar('government critic loss', gov_critic_loss, now_step)
