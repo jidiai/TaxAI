@@ -11,6 +11,8 @@ from agents.log_path import make_logpath
 from utils.experience_replay import replay_buffer
 from agents.utils import get_action_info
 from datetime import datetime
+from tensorboardX import SummaryWriter
+
 torch.autograd.set_detect_anomaly(True)
 
 def save_args(path, args):
@@ -67,21 +69,13 @@ class agent:
         self.model_path, _ = make_logpath(self.args.env_name, "baseline")
         save_args(path=self.model_path, args=self.args)
 
-        # get the observation
-        # self.batch_ob_shape = (self.args.num_workers * self.args.nsteps, ) + self.envs.observation_space.shape
-        # self.obs = np.zeros((self.args.num_workers, ) + self.envs.observation_space.shape, dtype=self.envs.observation_space.dtype.name)
-        # if self.args.env_type == 'mujoco':
-        #     self.obs[:] = np.expand_dims(self.running_state(self.envs.reset()), 0)
-        # else:
-        #     self.obs[:] = self.envs.reset()
-        # self.dones = [False for _ in range(self.args.num_workers)]
-        # self.model_path, _ = make_logpath(self.args.env_name, "ppo", self.args.k)
-        # save_args(path=self.model_path, args=self.args)
-
-
     def learn(self):
         # for loop
         global_timesteps = 0
+        # tensorboard
+        log_dir = str(self.model_path) + "/logs"
+        os.makedirs(log_dir)
+        logger = SummaryWriter(log_dir)
         # before the official training, do the initial exploration to add episodes into the replay buffer
         self._initial_exploration(exploration_policy=self.args.init_exploration_policy)
         # reset the environment
@@ -131,12 +125,28 @@ class agent:
                 np.savetxt(str(self.model_path) + "/reward.txt", rew)
                 epochs.append(now_step)
                 np.savetxt(str(self.model_path) + "/steps.txt", epochs)
+
+                logger.add_scalar('Government/mean_episode_rewards', mean_rewards, now_step)
+                logger.add_scalar('mean households utility', mean_rewards/self.args.n_households, now_step)
+                logger.add_scalar('Gini coef', self.envs.households.gini, now_step)
+                logger.add_scalar('government actor loss', gov_actor_loss, now_step)
+                logger.add_scalar('government critic loss', gov_critic_loss, now_step)
+                logger.add_scalar('households actor loss', house_actor_loss, now_step)
+                logger.add_scalar('households critic loss', house_critic_loss, now_step)
+
+                logger.add_scalar('income mean', next_global_obs[0], now_step)
+                logger.add_scalar('income std', next_global_obs[1], now_step)
+                logger.add_scalar('wealth mean', next_global_obs[2], now_step)
+                logger.add_scalar('wealth std', next_global_obs[3], now_step)
+
+
                 print(
                     '[{}] Epoch: {} / {}, Frames: {}, Rewards: {:.3f}, gov_actor_loss: {:.3f}, gov_critic_loss: {:.3f}, house_actor_loss: {:.3f}, house_critic_loss: {:.3f}'.format(
                         datetime.now(), epoch, self.args.n_epochs, (epoch + 1) * self.args.epoch_length, mean_rewards, gov_actor_loss, gov_critic_loss, house_actor_loss, house_critic_loss))
                 # save models
                 # torch.save(self.gov_actor.state_dict(), self.gov_critic.state_dict(), self.house_actor.state_dict(), self.house_critic.state_dict(), str(self.model_path) + '/model.pt')
 
+        logger.close()
 
     # do the initial exploration by using the uniform policy
     def _initial_exploration(self, exploration_policy='gaussian'):
@@ -215,8 +225,8 @@ class agent:
         house_pis = self.house_actor(global_obses, private_obses, gov_actions, update=True)
         house_actions_info = get_action_info(house_pis, cuda=self.args.cuda)
         house_actions_, house_pre_tanh_value = house_actions_info.select_actions(reparameterize=True)
-        house_log_prob = house_actions_info.get_log_prob(house_actions_, house_pre_tanh_value)
-        house_actor_loss = torch.mean(-house_log_prob.sum(2) * house_td_delta.detach().sum(1))
+        house_log_prob = house_actions_info.get_log_prob(house_actions_, house_pre_tanh_value)/self.args.n_households
+        house_actor_loss = torch.mean(-house_log_prob.sum(2) * house_td_delta.detach().mean(1))
 
         self.gov_actor_optim.zero_grad()
         self.gov_critic_optim.zero_grad()

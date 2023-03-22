@@ -6,8 +6,8 @@ from utils.seeds import set_seeds
 from arguments import get_args
 import os
 import torch
-os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
-torch.cuda.is_available()
+# os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
+
 if __name__ == '__main__':
     # set signle thread
     os.environ['OMP_NUM_THREADS'] = '1'
@@ -15,7 +15,7 @@ if __name__ == '__main__':
     # get arguments
     args = get_args()
     set_seeds(args)
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(args.device_num)
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.device_num)
 
     env = economic_society(args)
     env.reset()
@@ -39,6 +39,7 @@ if __name__ == '__main__':
     # # todo trainer 包括 government + N households
     trainer = agent(env, args)
     # start to learn
+    print("n_households:", args.n_households)
     trainer.learn()
     # # close the environment
     # env.close()

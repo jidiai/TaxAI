@@ -4,7 +4,7 @@ import argparse
 def get_args():
     parse = argparse.ArgumentParser()
     parse.add_argument('--env-name', type=str, default='wealth_distribution', help='the environment name')
-    parse.add_argument('--device-num', type=int, default=0, help='the number of cuda service num')
+    parse.add_argument('--device-num', type=int, default=1, help='the number of cuda service num')
     # parse.add_argument('--total-timesteps', type=int, default=int(1e7), help='the total num of timesteps to be run')
     parse.add_argument('--cuda', action='store_true', help='use GPU do the training')
     parse.add_argument('--seed', type=int, default=123, help='the random seed to reproduce results')

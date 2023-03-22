@@ -9,7 +9,9 @@ class Actor(nn.Module):
     def __init__(self, input_dims, action_dims, hidden_size, log_std_min, log_std_max):
         super(Actor, self).__init__()
         self.fc1 = nn.Linear(input_dims, hidden_size)
+        self.gru = GRU(hidden_size, hidden_size, 1, 0.1)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.tanh = nn.Tanh()
         self.mean = nn.Linear(hidden_size, action_dims)
         self.log_std = nn.Linear(hidden_size, action_dims)
         # the log_std_min and log_std_max
@@ -17,11 +19,12 @@ class Actor(nn.Module):
         self.log_std_max = log_std_max
 
     def forward(self, obs):
-        x = F.relu(self.fc1(obs))
-        x = F.relu(self.fc2(x))
-        mean = self.mean(x)
-        log_std = self.log_std(x)
-        # clamp the log std
+        out = self.fc1(obs)
+        out = self.gru(out)
+        out = self.fc2(out)
+        out = self.tanh(out)
+        mean = self.mean(out)
+        log_std = self.log_std(out)
         log_std = torch.clamp(log_std, min=self.log_std_min, max=self.log_std_max)
 
         return (mean, torch.exp(log_std))
@@ -32,8 +35,17 @@ class GRU(nn.Module):
         self.gru = nn.GRU(input_size, hidden_size, num_layers, dropout=dropout, batch_first=True)
 
     def forward(self, x):
-        out, _ = self.gru(x)
-        return out
+        if len(x.shape) == 3:
+            n_batch, n_agent, hidden_size = x.shape
+            reshape_x = x.reshape(-1, hidden_size)
+            x = reshape_x.view(len(reshape_x), 1, -1)
+            out, _ = self.gru(x)
+
+            return out.reshape(n_batch,n_agent,-1)
+        else:
+            x = x.view(len(x), 1, -1)
+            out, _ = self.gru(x)
+            return out.view(len(out),-1)
 
 # for households
 class SharedAgent(nn.Module):

@@ -7,8 +7,8 @@ import os
 
 def make_logpath(game_name, algo, test=False):
     base_dir = Path(__file__).resolve().parent
-    model_dir = base_dir / Path('./new_models') / game_name.replace('-', '_') / algo
-    log_dir = base_dir / Path('./new_models/config_training')
+    model_dir = base_dir / Path('./models') / game_name.replace('-', '_') / algo
+    log_dir = base_dir / Path('./models/config_training')
     if not log_dir.exists():
         os.makedirs(log_dir)
 

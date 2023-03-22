@@ -6,7 +6,7 @@ import math
 import torch
 
 class economic_society(BaseEntity):
-    name = "wealth distribution economic society"
+    name = "Ramsey"
     '''
     decision:
         government
@@ -67,48 +67,7 @@ class economic_society(BaseEntity):
         self.step_cnt += 1
         self.done = self.is_terminal()
 
-        return next_global_state, next_private_state, sum(households_utility), households_utility, self.done
-
-
-    # def step(self, action_dict):
-    #     self.valid_action_dict = self.is_valid(action_dict)
-    #     global_obs, private_obs, gov_reward, house_reward= self.run()
-    #     self.step_cnt += 1
-    #     self.done = self.is_terminal()
-    #
-    #     return obs, gov_reward, house_reward, self.done
-
-    # def run(self):
-    #
-    #
-
-        #
-        # """
-        # run a year
-        # """
-        # ################# entity step  ############################
-        # # for agent_name in self.possible_agents:                 #this take step in turns
-        # for agent_name, agent_action in self.valid_action_dict.items():
-        #     _state, _reward, _done = getattr(getattr(self, agent_name), 'entity_step')(self, agent_action)  # entity step
-        #     if _done:
-        #         self.done = _done
-        #         break               #break the for loop if done??
-        # ################## after each entity have taken actions, proceed an environment step ##########################3
-        #
-        # #TODO: global state change
-        #
-        #
-        # ##################### get obs ################################3
-        # self.agent_selection_idx = (self.agent_selection_idx+1)%len(self.possible_agents)  # take turn
-        #
-        # rets = {}
-        # next_agent_name = self.agent_selection
-        #
-        # rets[next_agent_name] = getattr(getattr(self, next_agent_name), 'get_obs')(self)
-        #
-        # # return rets, _reward
-        # return next_obs, gov_reward, house_reward
-
+        return next_global_state, next_private_state, np.mean(households_utility, axis=0), households_utility, self.done
 
     def is_valid(self, action_dict):
         return action_dict

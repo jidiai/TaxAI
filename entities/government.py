@@ -94,6 +94,7 @@ class Government(BaseEntity):
     def tax_function(self, income, asset):
         # x: input
         def tax_f(x, tau, xi):
+            xi = np.clip(xi, 0, 0.9)
             return x - (1 - tau)/(1-xi) * np.power(x, 1-xi)
 
         income_tax = tax_f(income, self.tau, self.xi)

@@ -34,6 +34,7 @@ class Household(BaseEntity):
         self.income = self.e * 1  # assume that income is proportional to e
         self.asset = self.initial_wealth_distribution()
         self.next_asset = None   # 为了将二者区分开来
+        self.gini = 0
 
 
         # space
@@ -73,6 +74,7 @@ class Household(BaseEntity):
         return e  # 换成tensor
 
     def reset(self, **custom_cfg):
+        self.gini = 0
         self.e = self.e_distribution()
         self.income = self.e * 1
         self.asset = self.initial_wealth_distribution()
@@ -92,11 +94,10 @@ class Household(BaseEntity):
         '''
         multi_actions = np.array([[p1,h1], [p2,h2],...,[pN, hN]]) (100 * 2)
         e.g.
+        multi_actions = np.random.random(size=(100, 2))
         '''
-        # multi_actions = np.random.random(size=(100, 2))
-
         saving_p = np.array(multi_actions[:, 0])[:,np.newaxis,...]
-        self.workingHours = np.array(multi_actions[:, 1])[:,np.newaxis,...]
+        self.workingHours = np.array(multi_actions[:, 1])[:,np.newaxis,...]    # for scale
 
         self.income = env.WageRate * self.e * self.workingHours + env.RentRate * self.asset
         tax = env.government.tax_function(self.income, self.asset)
@@ -109,11 +110,12 @@ class Household(BaseEntity):
         current_consumption = (1 - saving_p) * current_total_wealth
         # self.e = self.e_transition(self.ep_index)  # 注意 e 有没有变
 
-        self.reward = self.utility_function(current_consumption, self.workingHours)
-        terminated = bool(self.gini_coef(self.next_asset) > 0.8)
+        self.reward = self.utility_function(current_consumption/100, self.workingHours)
+        self.gini = self.gini_coef(self.next_asset)
+        terminated = bool(self.gini > 0.8)
 
         self.asset = copy.copy(self.next_asset)
-        # self.state = self.get_obs()
+
         return self.reward, terminated
 
     def utility_function(self, c_t, h_t):
@@ -121,6 +123,7 @@ class Household(BaseEntity):
         if 1-self.CRRA == 0 or 1 + self.IFE == 0:
             print("Assignment error of CRRA or IFE!")
         current_utility = c_t**(1-self.CRRA)/(1-self.CRRA) - h_t**(1 + self.IFE)/(1 + self.IFE)
+
         return current_utility
 
     def gini_coef(self, wealths):
