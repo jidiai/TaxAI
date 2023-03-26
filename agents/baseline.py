@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch import optim
 import os,sys
+import wandb
 sys.path.append(os.path.abspath('../..'))
 
 from agents.models import SharedAgent, SharedCritic, Actor, Critic
@@ -66,21 +67,27 @@ class agent:
         self.gov_action_max = self.envs.government.action_space.high[0]
         self.hou_action_max = self.envs.households.action_space.high[0]
 
-        self.model_path, _ = make_logpath(self.args.env_name, "baseline")
+        self.model_path, _ = make_logpath(algo="baseline")
         save_args(path=self.model_path, args=self.args)
+        wandb.init(
+            config=self.args,
+            project="AI_TaxingPolicy",
+            entity="ai_tax",
+            name=self.model_path.name +'  n='+ str(self.args.n_households),
+            dir=str(self.model_path),
+            job_type="training",
+            reinit=True
+        )
 
     def learn(self):
         # for loop
         global_timesteps = 0
-        # tensorboard
-        log_dir = str(self.model_path) + "/logs"
-        os.makedirs(log_dir)
-        logger = SummaryWriter(log_dir)
         # before the official training, do the initial exploration to add episodes into the replay buffer
         self._initial_exploration(exploration_policy=self.args.init_exploration_policy)
         # reset the environment
         global_obs, private_obs = self.envs.reset()
-        rew = []
+        gov_rew = []
+        house_rew = []
         epochs = []
         for epoch in range(self.args.n_epochs):
             # for each epoch, it will reset the environment
@@ -118,34 +125,43 @@ class agent:
             # print the log information
             if epoch % self.args.display_interval == 0:
                 # start to do the evaluation
-                mean_rewards = self._evaluate_agent()
+                mean_gov_rewards, mean_house_rewards = self._evaluate_agent()
                 # store rewards and step
                 now_step = (epoch + 1) * self.args.epoch_length
-                rew.append(mean_rewards)
-                np.savetxt(str(self.model_path) + "/reward.txt", rew)
+                gov_rew.append(mean_gov_rewards)
+                house_rew.append(mean_house_rewards)
+                np.savetxt(str(self.model_path) + "/gov_reward.txt", gov_rew)
+                np.savetxt(str(self.model_path) + "/house_reward.txt", house_rew)
                 epochs.append(now_step)
                 np.savetxt(str(self.model_path) + "/steps.txt", epochs)
 
-                logger.add_scalar('Government/mean households utility', mean_rewards, now_step)
-                logger.add_scalar('Gini coef', self.envs.households.gini, now_step)
-                logger.add_scalar('government actor loss', gov_actor_loss, now_step)
-                logger.add_scalar('government critic loss', gov_critic_loss, now_step)
-                logger.add_scalar('households actor loss', house_actor_loss, now_step)
-                logger.add_scalar('households critic loss', house_critic_loss, now_step)
-
-                logger.add_scalar('income mean', next_global_obs[0], now_step)
-                logger.add_scalar('income std', next_global_obs[1], now_step)
-                logger.add_scalar('wealth mean', next_global_obs[2], now_step)
-                logger.add_scalar('wealth std', next_global_obs[3], now_step)
+                # GDP + mean utility + wealth distribution + income distribution
+                wandb.log({"mean households utility": mean_house_rewards,
+                           "goverment utility": mean_gov_rewards,
+                           "wealth gini": self.envs.households.wealth_gini,
+                           "income gini": self.envs.households.income_gini,
+                           "GDP": self.envs.GDP,
+                           "government actor loss": gov_actor_loss,
+                           "government critic loss": gov_critic_loss,
+                           "households actor loss": house_actor_loss,
+                           "households critic loss": house_critic_loss,
+                           "steps": now_step})
 
 
                 print(
-                    '[{}] Epoch: {} / {}, Frames: {}, Rewards: {:.3f}, gov_actor_loss: {:.3f}, gov_critic_loss: {:.3f}, house_actor_loss: {:.3f}, house_critic_loss: {:.3f}'.format(
-                        datetime.now(), epoch, self.args.n_epochs, (epoch + 1) * self.args.epoch_length, mean_rewards, gov_actor_loss, gov_critic_loss, house_actor_loss, house_critic_loss))
+                    '[{}] Epoch: {} / {}, Frames: {}, gov_Rewards: {:.3f}, house_Rewards: {:.3f}, gov_actor_loss: {:.3f}, gov_critic_loss: {:.3f}, house_actor_loss: {:.3f}, house_critic_loss: {:.3f}'.format(
+                        datetime.now(), epoch, self.args.n_epochs, (epoch + 1) * self.args.epoch_length, mean_gov_rewards, mean_house_rewards, gov_actor_loss, gov_critic_loss, house_actor_loss, house_critic_loss))
                 # save models
-                # torch.save(self.gov_actor.state_dict(), self.gov_critic.state_dict(), self.house_actor.state_dict(), self.house_critic.state_dict(), str(self.model_path) + '/model.pt')
+                torch.save(self.gov_actor.state_dict(), str(self.model_path) + '/gov_actor.pt')
+                torch.save(self.house_actor.state_dict(), str(self.model_path) + '/house_actor.pt')
 
-        logger.close()
+        wandb.finish()
+
+    def test(self):
+        self.gov_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/wealth_distribution/baseline/run56/gov_actor.pt"))
+        self.house_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/wealth_distribution/baseline/run56/house_actor.pt"))
+        rew = self._evaluate_agent()
+        return rew
 
     # do the initial exploration by using the uniform policy
     def _initial_exploration(self, exploration_policy='gaussian'):
@@ -249,10 +265,12 @@ class agent:
 
     # evaluate the agent
     def _evaluate_agent(self):
-        total_reward = 0
+        total_gov_reward = 0
+        total_house_reward = 0
         for _ in range(self.args.eval_episodes):
             global_obs, private_obs = self.eval_env.reset()
             episode_gov_reward = 0
+            episode_mean_house_reward = 0
             while True:
                 with torch.no_grad():
                     global_obs_tensor = self._get_tensor_inputs(global_obs)
@@ -268,11 +286,14 @@ class agent:
                     next_global_obs, next_private_obs, gov_reward, house_reward, done = self.envs.step(action)
 
                 episode_gov_reward += gov_reward
+                episode_mean_house_reward += np.mean(house_reward)
                 if done:
                     break
                 global_obs = next_global_obs
                 private_obs = next_private_obs
 
-            total_reward += episode_gov_reward
-        avg_reward = total_reward / self.args.eval_episodes
-        return avg_reward[0]
+            total_gov_reward += episode_gov_reward
+            total_house_reward += episode_mean_house_reward
+        avg_gov_reward = total_gov_reward / self.args.eval_episodes
+        avg_house_reward = total_house_reward / self.args.eval_episodes
+        return avg_gov_reward[0], avg_house_reward

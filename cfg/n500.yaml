@@ -1,7 +1,6 @@
 expr_name: test
 log_dir: ./logs             #log directory
 seed: 0
-device_num: 1
 
 Environment:
   Entities:

@@ -37,6 +37,7 @@ class economic_society:
         self.episode_length = self.episode_years/self.year_per_step
         self.step_cnt = 0
         self.agent_selection_idx = 0
+        self.GDP = self.generate_gdp()
 
         # compute
         self.households_tax = self.government.tax_function(self.households.income, self.households.asset)
@@ -53,12 +54,17 @@ class economic_society:
         self.WageRate = (1 - self.alpha) * np.power(self.Kt/self.Lt, self.alpha)
         self.RentRate = self.alpha * np.power(self.Kt/self.Lt, self.alpha - 1)
 
+    def generate_gdp(self):
+        # C + I + G
+        gdp = sum(self.households.income)
+        return gdp
 
     def reset(self, **custom_cfg):
         self.government.reset()
         self.households.reset()
         self.WageRate = 1
         self.RentRate = 0.04
+        self.GDP = self.generate_gdp()
         self.done = False
         return self.get_obs()
 
@@ -70,9 +76,13 @@ class economic_society:
         # households step
         households_utility, self.done = self.households.entity_step(self, self.valid_action_dict[self.households.name])
         next_global_state, next_private_state = self.get_obs()
+        self.GDP = self.generate_gdp()
         self.step_cnt += 1
         self.done = self.is_terminal()
 
+        # gov reward = max(sum_utility/wealth_gini)
+        # return next_global_state, next_private_state, np.mean(households_utility, axis=0)/self.households.wealth_gini, households_utility, self.done
+        # gov reward = sum(utility)
         return next_global_state, next_private_state, np.mean(households_utility, axis=0), households_utility, self.done
 
 

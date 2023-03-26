@@ -34,7 +34,8 @@ class Household(BaseEntity):
         self.income = self.e * 1  # assume that income is proportional to e
         self.asset = self.initial_wealth_distribution()
         self.next_asset = None   # 为了将二者区分开来
-        self.gini = 0
+        self.wealth_gini = self.gini_coef(self.asset)
+        self.income_gini = self.gini_coef(self.income)
 
         action_dim = entity_args['action_shape']
         obs_dim = entity_args['observation_shape']
@@ -75,10 +76,11 @@ class Household(BaseEntity):
         return e  # 换成tensor
 
     def reset(self, **custom_cfg):
-        self.gini = 0
         self.e = self.e_distribution()
         self.income = self.e * 1
         self.asset = self.initial_wealth_distribution()
+        self.wealth_gini = self.gini_coef(self.asset)
+        self.income_gini = self.gini_coef(self.income)
         obs = self.get_obs()
 
         return obs
@@ -103,19 +105,22 @@ class Household(BaseEntity):
         self.workingHours = np.array(multi_actions[:, 1])[:,np.newaxis,...]
 
         self.income = env.WageRate * self.e * self.workingHours + env.RentRate * self.asset
-        tax = env.government.tax_function(self.income, self.asset)
-        current_total_wealth = self.income + self.asset - tax + self.transfer
+        income_tax, asset_tax = env.government.tax_function(self.income, self.asset)
+
+        post_income = self.income - income_tax + self.transfer
+        post_asset = self.asset - asset_tax
+        current_total_wealth = post_income + post_asset
 
         # compute tax
-        self.tax_array = tax - self.transfer  # N households tax array
-
+        self.tax_array = income_tax + asset_tax - self.transfer  # N households tax array
         self.next_asset = saving_p * current_total_wealth
         current_consumption = (1 - saving_p) * current_total_wealth
         # self.e = self.e_transition(self.ep_index)  # 注意 e 有没有变
 
         self.reward = self.utility_function(current_consumption/100, self.workingHours)
-        self.gini = self.gini_coef(self.next_asset)
-        terminated = bool(self.gini > 0.8)
+        self.wealth_gini = self.gini_coef(current_total_wealth)
+        self.income_gini = self.gini_coef(post_income)
+        terminated = bool(self.wealth_gini > 0.8)
 
         self.asset = copy.copy(self.next_asset)
 

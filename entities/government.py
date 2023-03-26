@@ -45,20 +45,6 @@ class Government(BaseEntity):
                        self.G])
 
 
-    # def get_obs(self):
-    #     # [income_mean, income_std, asset_mean, asset_std, K_{t-1}]
-    #
-    #     income = env.households.income
-    #     asset = env.households.asset
-    #     self.income_mean = np.mean(income)
-    #     self.income_std = np.std(income)
-    #
-    #     self.asset_mean = np.mean(asset)
-    #     self.asset_std = np.std(asset)
-    #
-    #     obs = np.array([self.income_mean, self.income_std, self.asset_mean, self.asset_std, env.Kt])
-    #
-    #     return obs
     def get_obs(self):
         pass
 
@@ -99,7 +85,7 @@ class Government(BaseEntity):
 
         income_tax = tax_f(income, self.tau, self.xi)
         asset_tax = tax_f(asset, self.tau_a, self.xi_a)
-        return income_tax + asset_tax
+        return income_tax, asset_tax
 
 
 

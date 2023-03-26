@@ -1,5 +1,5 @@
 # AI-TaxingPolicy
 
 ```bash
-python main.py --cinfig "n100"
+python main.py --config "n100"
 ```
