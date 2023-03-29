@@ -23,7 +23,7 @@ class Household(BaseEntity):
         # fixed hyperparameter
         self.CRRA = entity_args['CRRA']                                    #theta
         self.IFE = entity_args['IFE']                                      #inverse Frisch Elasticity
-        self.eta = entity_args['eta']                                                    # if eta=0, the transitory shocks are additive, if eta = 1, they are multiplicative
+        self.eta = entity_args['eta']                                       # if eta=0, the transitory shocks are additive, if eta = 1, they are multiplicative
         # self.beta = entity_args.beta                                    #discount factor
         self.transfer = entity_args['lump_sum_transfer']
         # todo N households 初始化 e0, wealth0 ??? 看文献
@@ -38,22 +38,26 @@ class Household(BaseEntity):
         self.income_gini = self.gini_coef(self.income)
 
         action_dim = entity_args['action_shape']
-        obs_dim = entity_args['observation_shape']
-        # space
         self.action_space = Box(
-            low=-1, high=1, shape=(action_dim,), dtype=np.float32  # todo low and high?
-        )
-        self.observation_space = Box(
-            low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32   # torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)
+            low=-1, high=1, shape=(action_dim,), dtype=np.float32
         )
 
 
     def e_distribution(self):
-        # todo 待修改与research papers对齐
-        # 目前建模成人的能力是一个正态分布 智商在 normal(100，15)
-        e0 = np.random.normal(loc=1, scale=0.15, size=[self.n_households,1])
-        return e0
-        # return torch.tensor(e0).unsqueeze(1)
+        # # todo 待修改与research papers对齐
+        # # 目前建模成人的能力是一个正态分布 智商在 normal(100，15)
+        # e0 = np.random.normal(loc=1, scale=0.15, size=[self.n_households,1])
+        # return e0
+        # # return torch.tensor(e0).unsqueeze(1)
+        x = np.linspace(0.01, 1, self.n_households)
+
+        def pareto(x):
+            a = 0.95  # pareto tail index, a 越大, e差距越小 a=0.95, Gini=0.65
+            return np.power(x, -1 / a)
+
+        y = pareto(x)
+
+        return np.array(y)[:,np.newaxis, ...]
 
     def e_transition(self, old_ep_index):
         '''
@@ -100,7 +104,6 @@ class Household(BaseEntity):
         multi_actions = np.random.random(size=(100, 2))
         '''
         # multi_actions = np.random.random(size=(100, 2))
-
         saving_p = np.array(multi_actions[:, 0])[:,np.newaxis,...]
         self.workingHours = np.array(multi_actions[:, 1])[:,np.newaxis,...]
 
@@ -117,10 +120,10 @@ class Household(BaseEntity):
         current_consumption = (1 - saving_p) * current_total_wealth
         # self.e = self.e_transition(self.ep_index)  # 注意 e 有没有变
 
-        self.reward = self.utility_function(current_consumption/100, self.workingHours)
+        self.reward = self.utility_function(current_consumption, self.workingHours)
         self.wealth_gini = self.gini_coef(current_total_wealth)
         self.income_gini = self.gini_coef(post_income)
-        terminated = bool(self.wealth_gini > 0.8)
+        terminated = bool(self.wealth_gini > 0.9)
 
         self.asset = copy.copy(self.next_asset)
 
@@ -128,9 +131,15 @@ class Household(BaseEntity):
 
     def utility_function(self, c_t, h_t):
         # life-time CRRA utility
-        if 1-self.CRRA == 0 or 1 + self.IFE == 0:
-            print("Assignment error of CRRA or IFE!")
-        current_utility = c_t**(1-self.CRRA)/(1-self.CRRA) - h_t**(1 + self.IFE)/(1 + self.IFE)
+        if 1-self.CRRA == 0:
+            u_c = np.log(c_t)
+        else:
+            u_c = c_t ** (1 - self.CRRA) / (1 - self.CRRA)
+        if 1 + self.IFE == 0:
+            u_h = np.log(h_t)
+        else:
+            u_h = h_t**(1 + self.IFE)/(1 + self.IFE)
+        current_utility = u_c - u_h
         return current_utility
 
     def gini_coef(self, wealths):
@@ -161,7 +170,7 @@ class Household(BaseEntity):
         x = np.linspace(0.01, 1, self.n_households)
 
         def pareto(x):
-            a = 1  # pareto tail index, a 越大, 贫富差距越小 a=1, Gini=0.58
+            a = 0.68  # pareto tail index, a 越大, 贫富差距越小 a=0.68, Gini=0.85
             return np.power(x, -1 / a)
 
         y = pareto(x)

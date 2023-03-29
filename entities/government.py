@@ -10,29 +10,28 @@ class Government(BaseEntity):
 
     def __init__(self, entity_args):
         super().__init__()
-        # todo entity_args 是设定好的嘛？？ 这些是 action
-        self.tau = 0.5
-        self.xi = 0.2
-        self.tau_a = 0.02
+
+        self.tau = 0.263
+        self.xi = 0.049
+        self.tau_a = 0
         self.xi_a = 0
         self.G = 0
 
         # self.env = None
         self.debt = 0
         self.next_debt = None
-        self.observation_space = Box(
-            low=-np.inf, high=np.inf, shape=(6,), dtype=np.float32
-        )
+        self.action_dim = entity_args['action_shape']
+
         self.action_space = Box(
-            low=-1, high=1, shape=(5,), dtype=np.float32
+            low=-1, high=1, shape=(self.action_dim,), dtype=np.float32
         )
 
 
     def reset(self, **custom_cfg):
         # todo 这些参数如何初始化？？
-        self.tau = 0.5
-        self.xi = 0.2
-        self.tau_a = 0.02
+        self.tau = 0.263
+        self.xi = 0.049
+        self.tau_a = 0
         self.xi_a = 0
         self.G = 0
 

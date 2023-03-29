@@ -4,6 +4,7 @@ from entities.government import Government
 import numpy as np
 import math
 import torch
+from gym.spaces import Box
 
 class economic_society:
     name = "wealth distribution economic society"
@@ -42,6 +43,15 @@ class economic_society:
         # compute
         self.households_tax = self.government.tax_function(self.households.income, self.households.asset)
 
+        # observation space
+        global_obs, private_obs = self.get_obs()
+        self.government.observation_space = Box(
+            low=-np.inf, high=np.inf, shape=(global_obs.shape[0],), dtype=np.float32
+        )
+        self.households.observation_space = Box(
+            low=-np.inf, high=np.inf, shape=(global_obs.shape[0] + private_obs.shape[1] + self.government.action_dim,), dtype=np.float32   # torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)
+        )
+
     @property
     def agent_selection(self):
         return self.possible_agents[self.agent_selection_idx]
@@ -68,13 +78,21 @@ class economic_society:
         self.done = False
         return self.get_obs()
 
+    def action_wrapper(self, actions):
+        '''
+        input: (-1,1)之间
+        output: (0.1, 0.9)
+        '''
+        new_action = (actions+1)/2
+        return np.clip(new_action, 0.01, 0.9)
+
 
     def step(self, action_dict):
         self.valid_action_dict = self.is_valid(action_dict)
         # government step
-        self.government.entity_step(self, self.valid_action_dict[self.government.name])
+        self.government.entity_step(self, self.action_wrapper(self.valid_action_dict[self.government.name]))
         # households step
-        households_utility, self.done = self.households.entity_step(self, self.valid_action_dict[self.households.name])
+        households_utility, self.done = self.households.entity_step(self, self.action_wrapper(self.valid_action_dict[self.households.name]))
         next_global_state, next_private_state = self.get_obs()
         self.GDP = self.generate_gdp()
         self.step_cnt += 1
@@ -100,7 +118,10 @@ class economic_society:
 
 
     def get_obs(self):
-        # get government obs
+        '''
+        v0:
+            global state: income_mean, income_std, asset_mean, asset_std, wage_rate, rent_rate
+        '''
         income = self.households.income
         asset = self.households.asset
         self.income_mean = np.mean(income)
@@ -111,6 +132,16 @@ class economic_society:
 
         global_obs = np.array([self.income_mean, self.income_std, self.asset_mean, self.asset_std, self.WageRate, self.RentRate])
         private_obs = self.households.get_obs()
+        # '''
+        # v1:
+        #     global state: {GDP, wealth_gini, wage_rate, rent_rate}
+        #     private state: {e_t^i, a_t^i}
+        # '''
+        # self.GDP = self.generate_gdp()
+        # wealth_gini = self.households.wealth_gini
+        # global_obs = np.array(
+        #     [self.GDP, wealth_gini, self.WageRate, self.RentRate],dtype=np.float32)
+        # private_obs = self.households.get_obs()
 
         return global_obs, private_obs
 
@@ -119,12 +150,6 @@ class economic_society:
         # if controllable, overwritten by the agent module
         pass
 
-    def entity_step(self, action):
-        # abilitiy transition
-
-
-
-        pass
 
     def close(self):
         # 待修改

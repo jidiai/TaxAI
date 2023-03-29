@@ -74,7 +74,8 @@ class get_action_info:
                 actions = self.dist.sample()
         else:
             actions = torch.tanh(self.mean)
-        return F.softmax(actions, dim=1)
+        #return F.softmax(actions, dim=1)
+        return actions
 
     def get_log_prob(self, actions, pre_tanh_value):
         log_prob = self.dist.log_prob(actions, pre_tanh_value=pre_tanh_value)

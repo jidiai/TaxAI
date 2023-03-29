@@ -1,30 +1,29 @@
 expr_name: test
 log_dir: ./logs             #log directory
 seed: 0
+device_num: 1
 
 Environment:
   Entities:
     - entity_name: 'government'
       entity_args:
         n: 1            #number of government
-        tau: 0.5
-        xi: 0.2
-        tau_a: 0.02
+        tau: 0.263
+        xi: 0.049
+        tau_a: 0
         xi_a: 0
         G: 0
-        observation_shape: 6
         action_shape: 5
 
     - entity_name: 'household'
       entity_args:
-        n: 5
+        n: 100
         consumption_range: 1
         working_hours_range: 24
-        CRRA: 2.0
-        IFE: 0.6
+        CRRA: 1
+        IFE: 2
         eta: 0
-        lump_sum_transfer: 0.0001
-        observation_shape: 13
+        lump_sum_transfer: 0.167
         action_shape: 2
 
   env_core:
@@ -38,7 +37,7 @@ Environment:
 
 
 Trainer:
-  n_households: 5
+  n_households: 100
   log_std_min:  -20
   log_std_max:  2
   hidden_size:  256
@@ -48,17 +47,17 @@ Trainer:
   buffer_size:  1e6
   env_name: 'wealth_distribution'
   init_exploration_policy:  1e3
-  n_epochs: 10000
-  epoch_length: 100
+  n_epochs: 3000
+  epoch_length: 1000
   update_cycles:  10
   target_update_interval: 1
-  display_interval: 20
-  batch_size: 100
-  gamma: 0.99
+  display_interval: 1
+  batch_size: 64
+  gamma: 0.975
   tau:  5e-3
-  eval_episodes: 50
-  init_exploration_steps: 50
-  device_num: 0
+  eval_episodes: 10
+  init_exploration_steps: 1000
+
 
 
 

@@ -101,8 +101,8 @@ class agent:
                 hou_action = get_action_info(hou_pi, cuda=self.args.cuda).select_actions(reparameterize=False)
                 gov_action = gov_action.cpu().numpy()[0]
                 hou_action = hou_action.cpu().numpy()[0]
-                action = {self.envs.government.name: self.gov_action_max * gov_action,
-                          self.envs.households.name: self.hou_action_max * hou_action}
+                action = {self.envs.government.name: gov_action,
+                          self.envs.households.name: hou_action}
                 next_global_obs, next_private_obs, gov_reward, house_reward, done = self.envs.step(action)
 
                 # store the episodes
