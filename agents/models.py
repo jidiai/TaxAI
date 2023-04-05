@@ -183,3 +183,4 @@ class SharedAgent(nn.Module):
         log_std = torch.clamp(log_std, min=self.log_std_min, max=self.log_std_max)
 
         return (mean, torch.exp(log_std))
+

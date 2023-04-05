@@ -34,13 +34,13 @@ class rule_agent:
         self.gov_action_max = self.envs.government.action_space.high[0]
         self.hou_action_max = self.envs.households.action_space.high[0]
 
-        self.model_path, _ = make_logpath(algo="baseline")
+        self.model_path, _ = make_logpath(algo="rule_based")
         save_args(path=self.model_path, args=self.args)
         wandb.init(
             config=self.args,
             project="AI_TaxingPolicy",
             entity="ai_tax",
-            name="Rule_based  "+self.model_path.name +'  n='+ str(self.args.n_households),
+            name=self.model_path.parent.name + "-" +self.model_path.name +'  n='+ str(self.args.n_households),
             dir=str(self.model_path),
             job_type="training",
             reinit=True

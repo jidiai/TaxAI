@@ -13,6 +13,7 @@ Environment:
         tau_a: 0
         xi_a: 0
         G: 0
+        G_scale: 10
         action_shape: 5
 
     - entity_name: 'household'
@@ -25,6 +26,13 @@ Environment:
         eta: 0
         lump_sum_transfer: 0.167
         action_shape: 2
+        WageRate: 1
+        RentRate: 0.04
+        e_p: 2.2e-6
+        e_q: 0.990
+        rho_e: 0.982
+        sigma_e: 0.200
+        super_e: 504.3
 
   env_core:
     possible_agents: ['government', 'households']
@@ -34,6 +42,8 @@ Environment:
       RentRate: 0.04
       episode_years: 100
       year_per_step: 1
+      depreciation_rate: 0.06
+      consumption_tax_rate: 0.065
 
 
 Trainer:

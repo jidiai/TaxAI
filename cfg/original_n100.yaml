@@ -26,6 +26,8 @@ Environment:
         lump_sum_transfer: 0.0001
         observation_shape: 13
         action_shape: 2
+        WageRate: 1
+        RentRate: 0.04
 
   env_core:
     possible_agents: ['government', 'households']

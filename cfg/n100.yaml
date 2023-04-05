@@ -25,6 +25,8 @@ Environment:
         eta: 0
         lump_sum_transfer: 0.167
         action_shape: 2
+        WageRate: 1
+        RentRate: 0.04
 
   env_core:
     possible_agents: ['government', 'households']

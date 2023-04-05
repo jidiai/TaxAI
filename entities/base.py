@@ -16,17 +16,17 @@ class BaseEntity(ABC):
     def reset(self):
         pass
 
-    @abstractmethod
-    def get_obs(self):
-        pass
+    # @abstractmethod
+    # def get_obs(self):
+    #     pass
 
-    @abstractmethod
-    def get_actions(self):
-        pass
-
-    @abstractmethod
-    def entity_step(self, action):
-        pass
+    # @abstractmethod
+    # def get_actions(self):
+    #     pass
+    #
+    # @abstractmethod
+    # def entity_step(self, action):
+    #     pass
 
 
     def get_metrics(self):

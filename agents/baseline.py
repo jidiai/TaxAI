@@ -31,18 +31,17 @@ class agent:
         self.args = args
         self.eval_env = copy.copy(envs)
         # start to build the network.
-        # todo initialize actor critic of government and households
-        self.gov_actor = Actor(self.envs.government.observation_space.shape[0], self.envs.government.action_space.shape[0], self.args.hidden_size, \
-                                            self.args.log_std_min, self.args.log_std_max)
-        self.house_actor = SharedAgent(self.envs.households.observation_space.shape[0], self.envs.households.action_space.shape[0], self.args.n_households,
-                                            self.args.log_std_min, self.args.log_std_max)
+        gov_obs_dim = self.envs.government.observation_space.shape[0]
+        gov_action_dim = self.envs.government.action_space.shape[0]
+        house_obs_dim = self.envs.households.observation_space.shape[0] + gov_action_dim
+        house_action_dim = self.envs.households.action_space.shape[0]
 
-        self.gov_critic = Critic(self.envs.government.observation_space.shape[0], self.args.hidden_size, self.envs.government.action_space.shape[0])
+        self.gov_actor = Actor(gov_obs_dim, gov_action_dim, self.args.hidden_size, self.args.log_std_min, self.args.log_std_max)
+        self.house_actor = SharedAgent(house_obs_dim, house_action_dim, self.args.n_households, self.args.log_std_min, self.args.log_std_max)
+        self.gov_critic = Critic(gov_obs_dim, self.args.hidden_size, gov_action_dim)
         self.target_gov_qf = copy.deepcopy(self.gov_critic)
-        self.house_critic = SharedCritic(self.envs.households.observation_space.shape[0],
-                                         self.envs.households.action_space.shape[0], self.args.hidden_size, self.args.n_households)
+        self.house_critic = SharedCritic(house_obs_dim, house_action_dim, self.args.hidden_size, self.args.n_households)
         self.target_house_qf = copy.deepcopy(self.house_critic)
-
 
         # if use the cuda...
         if self.args.cuda:
@@ -69,15 +68,15 @@ class agent:
 
         self.model_path, _ = make_logpath(algo="baseline")
         save_args(path=self.model_path, args=self.args)
-        wandb.init(
-            config=self.args,
-            project="AI_TaxingPolicy",
-            entity="ai_tax",
-            name=self.model_path.name +'  n='+ str(self.args.n_households),
-            dir=str(self.model_path),
-            job_type="training",
-            reinit=True
-        )
+        # wandb.init(
+        #     config=self.args,
+        #     project="AI_TaxingPolicy",
+        #     entity="ai_tax",
+        #     name=self.model_path.parent.name + "-"+ self.model_path.name +'  n='+ str(self.args.n_households),
+        #     dir=str(self.model_path),
+        #     job_type="training",
+        #     reinit=True
+        # )
 
     def learn(self):
         # for loop
@@ -116,7 +115,7 @@ class agent:
                     global_obs, private_obs = self.envs.reset()
             # after collect the samples, start to update the network
             for _ in range(self.args.update_cycles):
-                gov_actor_loss, gov_critic_loss, house_actor_loss, house_critic_loss = self._update_newtork()
+                gov_actor_loss, gov_critic_loss, house_actor_loss, house_critic_loss = self._update_network()
                 # update the target network
                 if global_timesteps % self.args.target_update_interval == 0:
                     self._update_target_network(self.target_gov_qf, self.gov_critic)
@@ -136,17 +135,17 @@ class agent:
                 np.savetxt(str(self.model_path) + "/steps.txt", epochs)
 
                 # GDP + mean utility + wealth distribution + income distribution
-                wandb.log({"mean households utility": mean_house_rewards,
-                           "goverment utility": mean_gov_rewards,
-                           "wealth gini": self.envs.households.wealth_gini,
-                           "income gini": self.envs.households.income_gini,
-                           "GDP": self.envs.GDP,
-                           "government actor loss": gov_actor_loss,
-                           "government critic loss": gov_critic_loss,
-                           "households actor loss": house_actor_loss,
-                           "households critic loss": house_critic_loss,
-                           "steps": now_step})
-
+                # wandb.log({"mean households utility": mean_house_rewards,
+                #            "goverment utility": mean_gov_rewards,
+                #            "wealth gini": self.envs.wealth_gini,
+                #            "income gini": self.envs.income_gini,
+                #            "GDP": self.envs.GDP,
+                #            "government actor loss": gov_actor_loss,
+                #            "government critic loss": gov_critic_loss,
+                #            "households actor loss": house_actor_loss,
+                #            "households critic loss": house_critic_loss,
+                #            "steps": now_step})
+                #
 
                 print(
                     '[{}] Epoch: {} / {}, Frames: {}, gov_Rewards: {:.3f}, house_Rewards: {:.3f}, gov_actor_loss: {:.3f}, gov_critic_loss: {:.3f}, house_actor_loss: {:.3f}, house_critic_loss: {:.3f}'.format(
@@ -155,7 +154,7 @@ class agent:
                 torch.save(self.gov_actor.state_dict(), str(self.model_path) + '/gov_actor.pt')
                 torch.save(self.house_actor.state_dict(), str(self.model_path) + '/house_actor.pt')
 
-        wandb.finish()
+        # wandb.finish()
 
     def test(self):
         self.gov_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/wealth_distribution/baseline/run56/gov_actor.pt"))
@@ -198,7 +197,7 @@ class agent:
         obs_tensor = torch.tensor(obs, dtype=torch.float32, device='cuda' if self.args.cuda else 'cpu').unsqueeze(0)
         return obs_tensor
 
-    def _update_newtork(self):
+    def _update_network(self):
         # smaple batch of samples from the replay buffer
         global_obses, private_obses, gov_actions, hou_actions, gov_rewards,\
         house_rewards, next_global_obses, next_private_obses, dones = self.buffer.sample(self.args.batch_size)
