@@ -68,15 +68,15 @@ class agent:
 
         self.model_path, _ = make_logpath(algo="baseline")
         save_args(path=self.model_path, args=self.args)
-        # wandb.init(
-        #     config=self.args,
-        #     project="AI_TaxingPolicy",
-        #     entity="ai_tax",
-        #     name=self.model_path.parent.name + "-"+ self.model_path.name +'  n='+ str(self.args.n_households),
-        #     dir=str(self.model_path),
-        #     job_type="training",
-        #     reinit=True
-        # )
+        wandb.init(
+            config=self.args,
+            project="AI_TaxingPolicy",
+            entity="ai_tax",
+            name=self.model_path.parent.name + "-"+ self.model_path.name +'  n='+ str(self.args.n_households),
+            dir=str(self.model_path),
+            job_type="training",
+            reinit=True
+        )
 
     def learn(self):
         # for loop
@@ -135,17 +135,17 @@ class agent:
                 np.savetxt(str(self.model_path) + "/steps.txt", epochs)
 
                 # GDP + mean utility + wealth distribution + income distribution
-                # wandb.log({"mean households utility": mean_house_rewards,
-                #            "goverment utility": mean_gov_rewards,
-                #            "wealth gini": self.envs.wealth_gini,
-                #            "income gini": self.envs.income_gini,
-                #            "GDP": self.envs.GDP,
-                #            "government actor loss": gov_actor_loss,
-                #            "government critic loss": gov_critic_loss,
-                #            "households actor loss": house_actor_loss,
-                #            "households critic loss": house_critic_loss,
-                #            "steps": now_step})
-                #
+                wandb.log({"mean households utility": mean_house_rewards,
+                           "goverment utility": mean_gov_rewards,
+                           "wealth gini": self.envs.wealth_gini,
+                           "income gini": self.envs.income_gini,
+                           "GDP": self.envs.GDP,
+                           "government actor loss": gov_actor_loss,
+                           "government critic loss": gov_critic_loss,
+                           "households actor loss": house_actor_loss,
+                           "households critic loss": house_critic_loss,
+                           "steps": now_step})
+
 
                 print(
                     '[{}] Epoch: {} / {}, Frames: {}, gov_Rewards: {:.3f}, house_Rewards: {:.3f}, gov_actor_loss: {:.3f}, gov_critic_loss: {:.3f}, house_actor_loss: {:.3f}, house_critic_loss: {:.3f}'.format(
@@ -154,7 +154,7 @@ class agent:
                 torch.save(self.gov_actor.state_dict(), str(self.model_path) + '/gov_actor.pt')
                 torch.save(self.house_actor.state_dict(), str(self.model_path) + '/house_actor.pt')
 
-        # wandb.finish()
+        wandb.finish()
 
     def test(self):
         self.gov_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/wealth_distribution/baseline/run56/gov_actor.pt"))
@@ -295,4 +295,4 @@ class agent:
             total_house_reward += episode_mean_house_reward
         avg_gov_reward = total_gov_reward / self.args.eval_episodes
         avg_house_reward = total_house_reward / self.args.eval_episodes
-        return avg_gov_reward[0], avg_house_reward
+        return avg_gov_reward, avg_house_reward

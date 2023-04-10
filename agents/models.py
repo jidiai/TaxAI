@@ -184,3 +184,32 @@ class SharedAgent(nn.Module):
 
         return (mean, torch.exp(log_std))
 
+
+class mlp(nn.Module):
+    def __init__(self, input_size, output_size, num_agent, log_std_min, log_std_max):
+        super(mlp, self).__init__()
+        self.fc1 = nn.Linear(input_size, 64)
+        self.gru = GRU(64, 128, 1, 0.1)
+        self.fc2 = nn.Linear(128, 64)
+        self.tanh = nn.Tanh()
+        self.mean = nn.Linear(64, output_size)
+        self.log_std = nn.Linear(64, output_size)
+        # the log_std_min and log_std_max
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
+        self.num_agent = num_agent
+
+    def forward(self, global_state, private_state, update=False):
+        n_global_obs = global_state.repeat(1, self.num_agent, 1)
+
+        inputs = torch.cat([n_global_obs, private_state], dim=-1)
+        out = self.fc1(inputs)
+        out = self.gru(out)
+        out = self.fc2(out)
+        out = self.tanh(out)
+        mean = self.mean(out)
+        log_std = self.log_std(out)
+        log_std = torch.clamp(log_std, min=self.log_std_min, max=self.log_std_max)
+
+        return (mean, torch.exp(log_std))
+

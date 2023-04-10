@@ -173,8 +173,8 @@ class independent_agent:
                 # GDP + mean utility + wealth distribution + income distribution
                 wandb.log({"mean households utility": mean_house_rewards,
                            "goverment utility": mean_gov_rewards,
-                           "wealth gini": self.envs.households.wealth_gini,
-                           "income gini": self.envs.households.income_gini,
+                           "wealth gini": self.envs.wealth_gini,
+                           "income gini": self.envs.income_gini,
                            "GDP": self.envs.GDP,
                            "government actor loss": gov_actor_loss,
                            "government critic loss": gov_critic_loss,
@@ -298,7 +298,7 @@ class independent_agent:
             total_house_reward += episode_mean_house_reward
         avg_gov_reward = total_gov_reward / self.args.eval_episodes
         avg_house_reward = total_house_reward / self.args.eval_episodes
-        return avg_gov_reward[0], avg_house_reward
+        return avg_gov_reward, avg_house_reward
 
 
 

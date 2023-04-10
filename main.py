@@ -4,6 +4,7 @@ from env.env_core import economic_society
 from agents.baseline import agent
 from agents.rule_based import rule_agent
 from agents.independent_RL import independent_agent
+from agents.calibration import calibration_agent
 from utils.seeds import set_seeds
 from arguments import get_args
 import os
@@ -43,6 +44,8 @@ if __name__ == '__main__':
         trainer = rule_agent(env, yaml_cfg.Trainer)
     elif args.alg == "independent":
         trainer = independent_agent(env, yaml_cfg.Trainer)
+    else:
+        trainer = calibration_agent(env, yaml_cfg.Trainer)
     # start to learn
     print("n_households: ", yaml_cfg.Trainer["n_households"])
     trainer.learn()

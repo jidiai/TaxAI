@@ -4,6 +4,7 @@ from utils.episode import EpisodeKey
 import numpy as np
 import copy
 import math
+import pandas as pd
 import random
 import quantecon as qe
 import matplotlib.pyplot as plt
@@ -30,33 +31,15 @@ class Household(BaseEntity):
         self.sigma_e = entity_args['sigma_e']
         self.super_e = entity_args['super_e']
 
-        # self.beta = entity_args.beta                                    #discount factor
-        # self.transfer = entity_args['lump_sum_transfer']
         self.action_dim = entity_args['action_shape']
-        # self.WageRate = entity_args['WageRate']
-        # self.RentRate = entity_args['RentRate']
+
+        self.real_income, self.wage_income, self.real_asset, self.real_consumption = self.get_real_data()
 
         self.reset()
         self.action_space = Box(
             low=-1, high=1, shape=(self.action_dim,), dtype=np.float32
         )
 
-
-    # def e_distribution(self):
-    #     # # todo 待修改与research papers对齐
-    #     # # 目前建模成人的能力是一个正态分布 智商在 normal(100，15)
-    #     # e0 = np.random.normal(loc=1, scale=0.15, size=[self.n_households,1])
-    #     # return e0
-    #     # # return torch.tensor(e0).unsqueeze(1)
-    #     x = np.linspace(0.01, 1, self.n_households)
-    #
-    #     def pareto(x):
-    #         a = 0.95  # pareto tail index, a 越大, e差距越小 a=0.95, Gini=0.65
-    #         return np.power(x, -1 / a)
-    #
-    #     y = pareto(x)
-    #
-    #     return np.array(y)[:,np.newaxis, ...]
 
     def e_initial(self, n):
         self.e_array = np.zeros((n, 2))  # super-star and normal
@@ -98,106 +81,14 @@ class Household(BaseEntity):
         self.e = np.sum(self.e_array, axis=1, keepdims=True)
 
 
-    # def e_transition(self, old_ep_index):
-    #     '''
-    #     已测试单人 e 计算, 目前 fix住e，没有转移 2023.3.14
-    #     '''
-    #     et_elements = [-0.574, -0.232, 0.114, 0.133, 0.817, 1.245]
-    #     et_prob = [0.263, 0.003, 0.556, 0.001, 0.001, 0.176]
-    #     e_T = random.choices(et_elements, et_prob)[0]
-    #
-    #     ep_elements = [0.580, 1.153, 1.926, 27.223]
-    #     ep_prob = np.array([[0.994, 0.002, 0.004, 0.00001],
-    #                 [0.019, 0.979, 0.001, 9e-05],
-    #                 [0.023, 0.000, 0.977, 5e-05],
-    #                 [0.000, 0.000, 0.012, 0.987]])
-    #     self.ep_index = random.choices(list(range(len(ep_elements))), ep_prob[old_ep_index])[0]
-    #     e_P = ep_elements[self.ep_index]
-    #
-    #
-    #     e = e_P + e_T * math.pow(e_P, self.eta)
-    #     return e  # 换成tensor
-
     def reset(self, **custom_cfg):
         # self.e = self.e_distribution()
 
         self.e_initial(self.n_households)
         self.generate_e_ability()
-        self.at = self.initial_wealth_distribution()
+        self.real_income, self.at = self.initial_wealth_distribution()
         self.at_next = copy.copy(self.at)
 
-
-
-    #
-    # def get_obs(self):
-    #     return np.concatenate((self.e, self.asset), -1)
-    #
-    # def get_actions(self):
-    #     #if controllable, overwritten by the agent module
-    #     pass
-
-    # def entity_step(self, env, multi_actions=None):
-    #     '''
-    #     multi_actions = np.array([[p1,h1], [p2,h2],...,[pN, hN]]) (100 * 2)
-    #     e.g.
-    #     multi_actions = np.random.random(size=(100, 2))
-    #     '''
-    #     self.asset = copy.copy(self.next_asset)
-    #     # multi_actions = np.random.random(size=(100, 2))
-    #     saving_p = np.array(multi_actions[:, 0])[:,np.newaxis,...]
-    #     self.workingHours = np.array(multi_actions[:, 1])[:,np.newaxis,...]
-    #
-    #     self.income = env.WageRate * self.e * self.workingHours + env.InterestRate * self.asset
-    #     income_tax, asset_tax = env.government.tax_function(self.income, self.asset)
-    #
-    #     post_income = self.income - income_tax + self.transfer
-    #     post_asset = self.asset - asset_tax
-    #     current_total_wealth = post_income + post_asset
-    #
-    #     # compute tax
-    #     self.tax_array = income_tax + asset_tax - self.transfer  # N households tax array
-    #     self.consumption = (1 - saving_p) * current_total_wealth
-    #     # self.e = self.e_transition(self.ep_index)  # 注意 e 有没有变
-    #     # todo Yt> Ct + Gt
-    #     Yt = env.generate_gdp()
-    #     if Yt < (np.sum(self.consumption) + env.government.G):
-    #         scale_p = Yt/(np.sum(self.consumption) + env.government.G)
-    #         self.consumption = self.consumption * scale_p
-    #         new_G = env.government.G * scale_p
-    #         env.government.next_debt = env.government.next_debt + (new_G - env.government.G) * 10
-    #     self.next_asset = current_total_wealth - self.consumption
-    #
-    #     self.reward = self.utility_function(self.consumption, self.workingHours)
-    #     self.wealth_gini = self.gini_coef(current_total_wealth)
-    #     self.income_gini = self.gini_coef(post_income)
-    #     terminated = bool(self.wealth_gini > 0.9)
-    #
-    #     return self.reward, terminated
-
-    # def utility_function(self, c_t, h_t):
-    #     # life-time CRRA utility
-    #     if 1-self.CRRA == 0:
-    #         u_c = np.log(c_t)
-    #     else:
-    #         u_c = c_t ** (1 - self.CRRA) / (1 - self.CRRA)
-    #     if 1 + self.IFE == 0:
-    #         u_h = np.log(h_t)
-    #     else:
-    #         u_h = h_t**(1 + self.IFE)/(1 + self.IFE)
-    #     current_utility = u_c - u_h
-    #     return current_utility
-    #
-    # def gini_coef(self, wealths):
-    #     '''
-    #     cite: https://github.com/stephenhky/econ_inequality/blob/master/ginicoef.py
-    #     '''
-    #     cum_wealths = np.cumsum(sorted(np.append(wealths, 0)))
-    #     sum_wealths = cum_wealths[-1]
-    #     xarray = np.array(range(0, len(cum_wealths))) / np.float(len(cum_wealths) - 1)
-    #     yarray = cum_wealths / sum_wealths
-    #     B = np.trapz(yarray, x=xarray)
-    #     A = 0.5 - B
-    #     return A / (A + B)
 
     def lorenz_curve(self, wealths):
         '''
@@ -212,15 +103,38 @@ class Household(BaseEntity):
         plt.show()
 
     def initial_wealth_distribution(self):  # 大部分国家财富分布遵循 pareto distribution
-        x = np.linspace(0.01, 1, self.n_households)
+        # x = np.linspace(0.01, 1, self.n_households)
+        #
+        # def pareto(x):
+        #     a = 0.68  # pareto tail index, a 越大, 贫富差距越小 a=0.68, Gini=0.85
+        #     return np.power(x, -1 / a)
+        #
+        # y = pareto(x)
+        #
+        # return np.array(y)[:,np.newaxis, ...]
+        real_income, _, asset, _ = self.sample_real_data()
+        return real_income,asset
 
-        def pareto(x):
-            a = 0.68  # pareto tail index, a 越大, 贫富差距越小 a=0.68, Gini=0.85
-            return np.power(x, -1 / a)
+    def get_real_data(self):
+        df = pd.read_csv('agents/cfg/scf2013.csv', header=None)
 
-        y = pareto(x)
+        income = df[0].values[1:].astype(np.float32)
+        # saving = df[1].values[1:].astype(np.float32)
+        wage_income = df[2].values[1:].astype(np.float32)
+        asset = df[3].values[1:].astype(np.float32)
+        c_1 = df[4].values[1:].astype(np.float32)
+        c_2 = df[5].values[1:].astype(np.float32)
+        c_3 = df[6].values[1:].astype(np.float32)
+        c_4 = df[7].values[1:].astype(np.float32)
+        return income, wage_income, asset, (c_1 + c_2 + c_3 + c_4)
 
-        return np.array(y)[:,np.newaxis, ...]
+    def sample_real_data(self):
+        index = [random.randint(0, len(self.real_income) - 1) for _ in range(self.n_households)]
+        batch_wage_income = self.wage_income[index]
+        batch_income = self.real_income[index]
+        batch_asset = self.real_asset[index]
+        batch_consumption = self.real_consumption[index]
+        return batch_wage_income.reshape(self.n_households, 1), batch_income.reshape(self.n_households, 1), batch_asset.reshape(self.n_households, 1), batch_consumption.reshape(self.n_households, 1)
 
 
     def render(self):

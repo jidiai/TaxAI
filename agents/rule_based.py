@@ -47,28 +47,16 @@ class rule_agent:
         )
 
     def learn(self):
-        # for loop
         global_timesteps = 0
-        # reset the environment
         global_obs, private_obs = self.envs.reset()
         gov_rew = []
         house_rew = []
         epochs = []
-        for epoch in range(self.args.n_epochs):
-            # for each epoch, it will reset the environment
-            # for t in range(self.args.epoch_length):
-            #     gov_action = np.array([0.263, 0.049, 0, 0, 0])
-            #     temp = np.zeros((self.args.n_households,2))
-            #     temp[:, 0] = 0.2
-            #     temp[:, 1] = 1/3
-            #     hou_action = temp
-            #
-            #     action = {self.envs.government.name: self.gov_action_max * gov_action,
-            #               self.envs.households.name: self.hou_action_max * hou_action}
-            #     next_global_obs, next_private_obs, gov_reward, house_reward, done = self.envs.step(action)
-            #     global_timesteps += 1
-            # print the log information
+        for epoch in range(1000):
+
+
             if epoch % self.args.display_interval == 0:
+
                 # start to do the evaluation
                 mean_gov_rewards, mean_house_rewards = self._evaluate_agent()
                 # store rewards and step
@@ -83,8 +71,8 @@ class rule_agent:
                 # GDP + mean utility + wealth distribution + income distribution
                 wandb.log({"mean households utility": mean_house_rewards,
                            "goverment utility": mean_gov_rewards,
-                           "wealth gini": self.envs.households.wealth_gini,
-                           "income gini": self.envs.households.income_gini,
+                           "wealth gini": self.envs.wealth_gini,
+                           "income gini": self.envs.income_gini,
                            "GDP": self.envs.GDP,
                            "steps": now_step})
                 print(
@@ -98,17 +86,18 @@ class rule_agent:
         total_gov_reward = 0
         total_house_reward = 0
         for _ in range(self.args.eval_episodes):
+            global_obs, private_obs = self.envs.reset()
             episode_gov_reward = 0
             episode_mean_house_reward = 0
             while True:
                 with torch.no_grad():
-                    gov_action = np.array([0.263, 0.049, 0, 0, 0])
+                    gov_action = np.array([0.263, 0.049, 0.02, 0, 0, 0.4])
                     temp = np.zeros((self.args.n_households, 2))
-                    temp[:, 0] = 0.2
+                    temp[:, 0] = 0.9
                     temp[:, 1] = 1 / 3
-                    hou_action = temp *2-1
+                    hou_action = temp * 2 - 1
 
-                    action = {self.envs.government.name: self.gov_action_max * (gov_action*2-1),
+                    action = {self.envs.government.name: self.gov_action_max * (gov_action * 2 - 1),
                               self.envs.households.name: self.hou_action_max * hou_action}
                     next_global_obs, next_private_obs, gov_reward, house_reward, done = self.envs.step(action)
 
@@ -121,4 +110,4 @@ class rule_agent:
             total_house_reward += episode_mean_house_reward
         avg_gov_reward = total_gov_reward / self.args.eval_episodes
         avg_house_reward = total_house_reward / self.args.eval_episodes
-        return avg_gov_reward[0], avg_house_reward
+        return avg_gov_reward, avg_house_reward

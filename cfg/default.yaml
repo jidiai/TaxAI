@@ -14,7 +14,7 @@ Environment:
         xi_a: 0
         G: 0
         G_scale: 10
-        action_shape: 5
+        action_shape: 6
 
     - entity_name: 'household'
       entity_args:
@@ -24,7 +24,6 @@ Environment:
         CRRA: 1
         IFE: 2
         eta: 0
-        lump_sum_transfer: 0.167
         action_shape: 2
         WageRate: 1
         RentRate: 0.04
@@ -44,6 +43,8 @@ Environment:
       year_per_step: 1
       depreciation_rate: 0.06
       consumption_tax_rate: 0.065
+      interest_rate: 0.04
+      hours_max: 7093
 
 
 Trainer:

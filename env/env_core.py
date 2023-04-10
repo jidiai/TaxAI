@@ -29,7 +29,8 @@ class economic_society:
         self.alpha = eval(env_args['alpha'])
 
         self.depreciation_rate = env_args['depreciation_rate']
-        # self.possible_agents = cfg['env_core']['possible_agents']  #['government', 'households']
+        self.interest_rate = env_args['interest_rate']
+        self.hours_max = env_args['hours_max']
         self.episode_years = env_args['episode_years']
         self.year_per_step = env_args['year_per_step']
         self.consumption_tax_rate = env_args['consumption_tax_rate']
@@ -44,21 +45,12 @@ class economic_society:
         self.households.observation_space = Box(
             low=-np.inf, high=np.inf, shape=(global_obs.shape[0] + private_obs.shape[1],), dtype=np.float32   # torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)
         )
-        # self.government.observation_space = Box(
-        #     low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32
-        # )
-        # self.households.observation_space = Box(
-        #     low=-np.inf, high=np.inf, shape=(8+2,), dtype=np.float32   # torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)
-        # )
-
 
     def MarketClear(self):
         # aggregate labor
         self.Lt = np.sum(self.households.e * self.ht)
         # Equilibrium
         self.WageRate = (1 - self.alpha) * np.power(self.Kt/self.Lt, self.alpha)
-        self.RentRate = self.alpha * np.power(self.Kt/self.Lt, self.alpha - 1)
-
 
     def generate_gdp(self):
         # C + X + G  = Yt = sum(labor_income) + Rt*Kt
@@ -74,8 +66,7 @@ class economic_society:
         return np.clip(new_action, 0.001, 0.9)
 
     def workinghours_wrapper(self, ht):
-        new_action = (ht + 1) / 2
-        return 24 * new_action   # 当前working utility: ht=24, u_h = -4608; ht=8, u_h = -170
+        return self.hours_max * ht
 
 
     def step(self, action_dict):
@@ -86,15 +77,8 @@ class economic_society:
         self.Kt = copy.copy(self.Kt_next)
         self.Bt = copy.copy(self.Bt_next)
         self.households.at = copy.copy(self.households.at_next)
-        self.Rt_past = copy.copy(self.RentRate)
 
-        # government action
-        self.tau_prob, self.xi_prob, self.tau_a_prob, self.xi_a_prob, self.Gt_prob = self.action_wrapper(
-            self.valid_action_dict[self.government.name])
-        self.government.tau = self.tau_prob
-        self.government.xi = self.xi_prob
-        self.government.tau_a = self.tau_a_prob
-        self.government.xi_a = self.xi_a_prob
+        self.government.tau, self.government.xi, self.government.tau_a, self.government.xi_a, self.Gt_prob, self.Bt2At = self.action_wrapper(self.valid_action_dict[self.government.name])
         # households action
         multi_actions = self.action_wrapper(self.valid_action_dict[self.households.name])
         saving_p = np.array(multi_actions[:, 0])[:,np.newaxis,...]
@@ -106,8 +90,7 @@ class economic_society:
         self.GDP = self.generate_gdp()
         Gt = 0.189 * self.GDP
 
-        # self.income = self.WageRate * self.households.e * self.workingHours + self.Rt_past * self.households.at
-        self.income = self.WageRate * self.households.e * self.ht + (self.RentRate - self.depreciation_rate) * self.households.at
+        self.income = self.WageRate * self.households.e * self.ht + self.interest_rate * self.households.at
         income_tax, asset_tax = self.tax_function(self.income, self.households.at)
 
         post_income = self.income - income_tax
@@ -127,22 +110,32 @@ class economic_society:
         self.households.at_next = total_wealth - self.consumption * (1+self.consumption_tax_rate)
         self.tax_array = income_tax + asset_tax + consumption_tax
 
-
-        self.Bt_next = (1 + (self.RentRate - self.depreciation_rate)) * self.Bt + Gt - np.sum(self.tax_array)
-        self.Kt_next = np.sum(self.households.at_next) - self.Bt_next
+        self.Bt_next = self.Bt2At * np.sum(self.households.at_next)
+        self.Kt_next = (1-self.Bt2At) * np.sum(self.households.at_next)
+        lump_sum_transfer = self.Bt_next + np.sum(self.tax_array) - (1 + self.interest_rate) * self.Bt - Gt
+        self.households.at_next += self.households.at_next/np.sum(self.households.at_next)*lump_sum_transfer
 
         # next state
         next_global_state, next_private_state = self.get_obs()
         # terminal
         self.wealth_gini = self.gini_coef(self.households.at_next)
         self.income_gini = self.gini_coef(post_income)
-        self.done = bool(self.wealth_gini > 0.9)
-        self.step_cnt += 1
-        self.done = self.is_terminal()
 
         # reward
         self.households_reward = self.utility_function(self.consumption, self.ht)
-        self.government_reward = np.mean(self.households_reward, axis=0)
+        # self.government_reward = np.mean(self.households_reward, axis=0)
+        # todo 将GDP当作government objective
+        self.government_reward = self.GDP / self.wealth_gini
+        self.done = bool(self.wealth_gini > 0.9 or math.isnan(self.government_reward))
+        if math.isnan(self.government_reward):
+            self.ht = self.workinghours_wrapper(np.ones((self.households.n_households, 1)))
+            self.consumption = np.zeros((self.households.n_households, 1)) + 0.001
+            self.households_reward = self.utility_function(self.consumption, self.ht)
+            self.government_reward = np.mean(self.households_reward, axis=0)
+
+        self.step_cnt += 1
+
+        self.done = self.is_terminal()
 
         return next_global_state, next_private_state, self.government_reward, self.households_reward, self.done
 
@@ -170,8 +163,7 @@ class economic_society:
         self.workingHours = np.ones((self.households.n_households,1))/3
         self.ht = self.workinghours_wrapper(self.workingHours)
         self.MarketClear()
-        self.income = self.households.e * self.workinghours_wrapper(self.workingHours)
-
+        self.income = self.households.e * self.ht
         return self.get_obs()
 
     def get_obs(self):
@@ -188,7 +180,7 @@ class economic_society:
         asset_mean = np.mean(wealth)
         asset_std = np.std(wealth)
 
-        global_obs = np.array([income_mean, income_std, asset_mean, asset_std, self.WageRate, self.RentRate, self.Kt, self.Lt])
+        global_obs = np.array([income_mean, income_std, asset_mean, asset_std, self.WageRate, self.Kt, self.Lt])
         private_obs = np.concatenate((self.households.e, wealth), -1)
 
         return global_obs, private_obs
@@ -202,7 +194,7 @@ class economic_society:
         if 1 + self.households.IFE == 0:
             u_h = np.log(h_t)
         else:
-            u_h = h_t**(1 + self.households.IFE)/(1 + self.households.IFE)
+            u_h = ((h_t/1000)**(1 + self.households.IFE)/(1 + self.households.IFE))
         current_utility = u_c - u_h
         return current_utility
 
