@@ -6,6 +6,12 @@ import math
 import torch
 from gym.spaces import Box
 import copy
+import pygame
+import sys
+import os
+
+from pathlib import Path
+ROOT_PATH = str(Path(__file__).resolve().parent.parent)
 
 class economic_society:
     name = "wealth distribution economic society"
@@ -45,6 +51,18 @@ class economic_society:
         self.households.observation_space = Box(
             low=-np.inf, high=np.inf, shape=(global_obs.shape[0] + private_obs.shape[1],), dtype=np.float32   # torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)
         )
+
+        self.display_mode = False
+
+    @property
+    def action_spaces(self):
+        return {self.households.name: self.households.action_space,
+                self.government.name: self.government.action_space}
+
+    @property
+    def observation_spaces(self):
+        return {self.households.name: self.households.observation_space,
+                self.government.name: self.government.observation_space}
 
     def MarketClear(self):
         # aggregate labor
@@ -164,6 +182,8 @@ class economic_society:
         self.ht = self.workinghours_wrapper(self.workingHours)
         self.MarketClear()
         self.income = self.households.e * self.ht
+
+        self.display_mode = False
         return self.get_obs()
 
     def get_obs(self):
@@ -220,6 +240,41 @@ class economic_society:
         return income_tax, asset_tax
 
 
+    def _load_image(self):
+        self.gov_img = pygame.image.load(os.path.join(ROOT_PATH, "img/gov.jpeg"))
+        self.house_img = pygame.image.load(os.path.join(ROOT_PATH, "img/household.jpeg"))
+
+
+    def render(self):
+        if not self.display_mode:
+            self.background = pygame.display.set_mode([500,500])
+            self.display_mode = True
+            self._load_image()
+
+        self.background.fill((255,255,255))
+
+        debug(f"Step {self.step_cnt}")
+        debug("Lt: "+"{:.3g}".format(self.Lt), x=400, y=10)
+        debug("WageRate: "+"{:.3f}".format(self.WageRate), x=400, y=30)
+        debug('GDP: '+"{:.3g}".format(self.GDP), x=400, y=50)
+
+
+        gov_img = pygame.transform.scale(self.gov_img, size=(50, 50))
+        self.background.blit(gov_img, [100,100])
+
+        house_img = pygame.transform.scale(self.house_img, size=(50, 50))
+        self.background.blit(house_img, [300,300])
+
+        for event in pygame.event.get():
+            # 如果单击关闭窗口，则退出
+            if event.type == pygame.QUIT:
+                sys.exit()
+        pygame.display.flip()
+
+
+
+
+
     def close(self):
         # 待修改
         if self.screen is not None:
@@ -231,4 +286,29 @@ class economic_society:
 
 
 
+
+COLORS = {
+    'red': [255,0,0],
+    'light red': [255, 127, 127],
+    'green': [0, 255, 0],
+    'blue': [0, 0, 255],
+    'orange': [255, 127, 0],
+    'grey':  [176,196,222],
+    'purple': [160, 32, 240],
+    'black': [0, 0, 0],
+    'white': [255, 255, 255],
+    'light green': [204, 255, 229],
+    'sky blue': [0,191,255],
+    # 'red-2': [215,80,83],
+    # 'blue-2': [73,141,247]
+}
+
+
+pygame.init()
+font = pygame.font.Font(None, 18)
+def debug(info, y = 10, x=10, c='black'):
+    display_surf = pygame.display.get_surface()
+    debug_surf = font.render(str(info), True, COLORS[c])
+    debug_rect = debug_surf.get_rect(topleft = (x,y))
+    display_surf.blit(debug_surf, debug_rect)
 
