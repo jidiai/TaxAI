@@ -103,6 +103,7 @@ class economic_society:
         self.workingHours = np.array(multi_actions[:, 1])[:,np.newaxis,...]
         self.ht = self.workinghours_wrapper(self.workingHours)
 
+        self.mean_saving_p = saving_p.mean()
         # market clear
         self.MarketClear()
         self.GDP = self.generate_gdp()
@@ -242,7 +243,9 @@ class economic_society:
 
     def _load_image(self):
         self.gov_img = pygame.image.load(os.path.join(ROOT_PATH, "img/gov.jpeg"))
-        self.house_img = pygame.image.load(os.path.join(ROOT_PATH, "img/household.jpeg"))
+        self.house_img = pygame.image.load(os.path.join(ROOT_PATH, "img/household.png"))
+        self.firm_img = pygame.image.load(os.path.join(ROOT_PATH, "img/firm.png"))
+        self.bank_img = pygame.image.load(os.path.join(ROOT_PATH, "img/bank.jpeg"))
 
 
     def render(self):
@@ -254,16 +257,41 @@ class economic_society:
         self.background.fill((255,255,255))
 
         debug(f"Step {self.step_cnt}")
-        debug("Lt: "+"{:.3g}".format(self.Lt), x=400, y=10)
-        debug("WageRate: "+"{:.3f}".format(self.WageRate), x=400, y=30)
-        debug('GDP: '+"{:.3g}".format(self.GDP), x=400, y=50)
-
+        debug("Mean Social Welfare: "+"{:.3g}".format(float(self.households_reward.mean())), x=280, y=10)
+        debug("Wealth Gini: "+"{:.3g}".format(self.wealth_gini), x=348, y=30)
+        debug("Income Gini: "+"{:.3g}".format(self.income_gini), x=348, y=50)
+        debug('GDP: '+"{:.3g}".format(self.GDP), x=390, y=70)
 
         gov_img = pygame.transform.scale(self.gov_img, size=(50, 50))
         self.background.blit(gov_img, [100,100])
+        debug("Tau: "+"{:.3g}".format(self.government.tau), x=10, y=80)
+        debug("Xi: "+"{:.3g}".format(self.government.xi), x=10, y=100)
+        debug("Tau_a"+"{:.3g}".format(self.government.tau_a), x=10, y=120)
+        debug("Xi_a: "+"{:.3g}".format(self.government.xi_a), x=10, y=140)
+        debug("Gt_prob: "+"{:.3g}".format(self.Gt_prob), x=10, y=160)
+        debug("Bt2At: "+"{:.3g}".format(self.Bt2At), x=10, y=180)
 
         house_img = pygame.transform.scale(self.house_img, size=(50, 50))
-        self.background.blit(house_img, [300,300])
+        self.background.blit(house_img, [200,400])
+        self.background.blit(house_img, [160,400])
+        self.background.blit(house_img, [180,440])
+        debug("Mean Working Hours: "+"{:.3g}".format(self.workingHours.mean()), x=250, y=450)
+        debug("Mean Saving Prop: "+"{:.3g}".format(self.mean_saving_p), x=250, y=470)
+
+        firm_img = pygame.transform.scale(self.firm_img, size=(50,50))
+        self.background.blit(firm_img, [400,170])
+        debug("Wage Rate: "+"{:.3g}".format(self.WageRate), x=370, y=230)
+
+        pygame.draw.line(self.background, COLORS['blue'], (140,150), (190, 390), width=10)
+        pygame.draw.line(self.background, COLORS['blue'], (220,390), (390, 210), width=10)
+        pygame.draw.line(self.background, COLORS['blue'], (160,130), (390, 180), width=10)
+
+        bank_img = pygame.transform.scale(self.bank_img, size=(50,50))
+        self.background.blit(bank_img, [230,200])
+
+        pygame.draw.line(self.background, COLORS['blue'], (145,145), (225, 195), width=10)
+        pygame.draw.line(self.background, COLORS['blue'], (205,390), (250, 255), width=10)
+        pygame.draw.line(self.background, COLORS['blue'], (380,195), (280, 230), width=10)
 
         for event in pygame.event.get():
             # 如果单击关闭窗口，则退出
@@ -305,7 +333,7 @@ COLORS = {
 
 
 pygame.init()
-font = pygame.font.Font(None, 18)
+font = pygame.font.Font(None, 22)
 def debug(info, y = 10, x=10, c='black'):
     display_surf = pygame.display.get_surface()
     debug_surf = font.render(str(info), True, COLORS[c])
