@@ -1,8 +1,10 @@
 import numpy as np
 import torch
 from torch.distributions.normal import Normal
+from torch.distributions.beta import Beta
+from torch.distributions.categorical import Categorical
 from torch.distributions import Distribution
-from torch.nn import functional as F
+
 
 """
 the tanhnormal distributions from rlkit may not stable
@@ -102,3 +104,17 @@ class ounoise():
             self.std * np.sqrt(self.dt) * np.random.normal(size=self.action_dim)
         self.x_prev = x
         return x
+
+
+def select_actions(pi):
+    mean, std = pi
+    actions = Normal(mean, std).sample()
+    # return actions
+    return actions.detach().cpu().numpy().squeeze()
+
+def evaluate_actions(pi, actions):
+    mean, std = pi
+    normal_dist = Normal(mean, std)
+    log_prob = normal_dist.log_prob(actions).sum(dim=1, keepdim=True)
+    entropy = normal_dist.entropy().mean()
+    return log_prob, entropy

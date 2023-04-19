@@ -91,7 +91,7 @@ class rule_agent:
             episode_mean_house_reward = 0
             while True:
                 with torch.no_grad():
-                    gov_action = np.array([0.263, 0.049, 0.02, 0, 0, 0.4])
+                    gov_action = np.array([0.263, 0.049, 0.02, 0, 0.189, 0.4])
                     temp = np.zeros((self.args.n_households, 2))
                     temp[:, 0] = 0.9
                     temp[:, 1] = 1 / 3

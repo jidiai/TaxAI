@@ -25,8 +25,8 @@ Environment:
         IFE: 2
         eta: 0
         action_shape: 2
-        WageRate: 1
-        RentRate: 0.04
+#        WageRate: 1
+#        RentRate: 0.04
         e_p: 2.2e-6
         e_q: 0.990
         rho_e: 0.982
@@ -37,8 +37,8 @@ Environment:
     possible_agents: ['government', 'households']
     env_args:
       alpha: 1/3
-      WageRate: 1
-      RentRate: 0.04
+#      WageRate: 1
+#      RentRate: 0.04
       episode_years: 100
       year_per_step: 1
       depreciation_rate: 0.06
@@ -57,7 +57,7 @@ Trainer:
   p_lr: 3e-4
   buffer_size:  1e6
   env_name: 'wealth_distribution'
-  init_exploration_policy:  1e3
+  init_exploration_policy:  'gaussian'
   n_epochs: 3000
   epoch_length: 1000
   update_cycles:  10

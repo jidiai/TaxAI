@@ -88,7 +88,7 @@ class economic_society:
         # market clear
         self.MarketClear()
         self.GDP = self.generate_gdp()
-        Gt = 0.189 * self.GDP
+        Gt = self.Gt_prob * self.GDP
 
         self.income = self.WageRate * self.households.e * self.ht + self.interest_rate * self.households.at
         income_tax, asset_tax = self.tax_function(self.income, self.households.at)
@@ -125,8 +125,8 @@ class economic_society:
         self.households_reward = self.utility_function(self.consumption, self.ht)
         # self.government_reward = np.mean(self.households_reward, axis=0)
         # todo 将GDP当作government objective
-        self.government_reward = self.GDP / self.wealth_gini
-        self.done = bool(self.wealth_gini > 0.9 or math.isnan(self.government_reward))
+        self.government_reward = self.GDP /  self.wealth_gini * self.income_gini
+        self.done = bool(self.wealth_gini > 0.8 or math.isnan(self.government_reward))
         if math.isnan(self.government_reward):
             self.ht = self.workinghours_wrapper(np.ones((self.households.n_households, 1)))
             self.consumption = np.zeros((self.households.n_households, 1)) + 0.001
