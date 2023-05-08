@@ -21,10 +21,11 @@ class Government(BaseEntity):
 
 
     def reset(self, **custom_cfg):
-        self.tau = self.entity_args["tau"]
-        self.xi = self.entity_args["xi"]
-        self.tau_a = self.entity_args["tau_a"]
-        self.xi_a = self.entity_args["xi_a"]
+        pass
+        # self.tau = self.entity_args["tau"]
+        # self.xi = self.entity_args["xi"]
+        # self.tau_a = self.entity_args["tau_a"]
+        # self.xi_a = self.entity_args["xi_a"]
 
 
     def obs_transfer(self, income, asset):

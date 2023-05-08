@@ -160,7 +160,7 @@ class independent_agent:
                 # print the log information
             if epoch % self.args.display_interval == 0:
                 # start to do the evaluation
-                mean_gov_rewards, mean_house_rewards = self._evaluate_agent()
+                mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income = self._evaluate_agent()
                 # store rewards and step
                 now_step = (epoch + 1) * self.args.epoch_length
                 gov_rew.append(mean_gov_rewards)
@@ -176,6 +176,9 @@ class independent_agent:
                            "wealth gini": self.envs.wealth_gini,
                            "income gini": self.envs.income_gini,
                            "GDP": self.envs.GDP,
+                           "tax per households": avg_mean_tax,
+                           "post income per households": avg_mean_post_income,
+                           "wealth per households": avg_mean_wealth,
                            "government actor loss": gov_actor_loss,
                            "government critic loss": gov_critic_loss,
                            "households actor loss": house_actor_loss,
@@ -263,14 +266,20 @@ class independent_agent:
         return gov_actor_loss.item(), gov_critic_loss.item(), house_actor_loss.item(), house_critic_loss.item()
 
 
-    # evaluate the agent
     def _evaluate_agent(self):
         total_gov_reward = 0
         total_house_reward = 0
+        total_mean_tax = 0
+        total_mean_wealth = 0
+        total_mean_post_income = 0
         for _ in range(self.args.eval_episodes):
             global_obs, private_obs = self.eval_env.reset()
             episode_gov_reward = 0
             episode_mean_house_reward = 0
+            episode_mean_tax = 0
+            episode_mean_wealth = 0
+            episode_mean_post_income = 0
+
             while True:
                 with torch.no_grad():
                     # start to collect samples
@@ -283,12 +292,15 @@ class independent_agent:
                     gov_action = gov_action.cpu().numpy()[0]
                     hou_action = hou_action.cpu().numpy()
                     gov_action, hou_action = self.add_noise(gov_action, hou_action)
-                    action = {self.envs.government.name: gov_action,
-                              self.envs.households.name: hou_action}
-                    next_global_obs, next_private_obs, gov_reward, house_reward, done = self.envs.step(action)
+                    action = {self.eval_env.government.name: gov_action,
+                              self.eval_env.households.name: hou_action}
+                    next_global_obs, next_private_obs, gov_reward, house_reward, done = self.eval_env.step(action)
 
                 episode_gov_reward += gov_reward
                 episode_mean_house_reward += np.mean(house_reward)
+                episode_mean_tax += np.mean(self.eval_env.tax_array)
+                episode_mean_wealth += np.mean(self.eval_env.households.at_next)
+                episode_mean_post_income += np.mean(self.eval_env.post_income)
                 if done:
                     break
                 global_obs = next_global_obs
@@ -296,9 +308,16 @@ class independent_agent:
 
             total_gov_reward += episode_gov_reward
             total_house_reward += episode_mean_house_reward
+            total_mean_tax += episode_mean_tax
+            total_mean_wealth += episode_mean_wealth
+            total_mean_post_income += episode_mean_post_income
+
         avg_gov_reward = total_gov_reward / self.args.eval_episodes
         avg_house_reward = total_house_reward / self.args.eval_episodes
-        return avg_gov_reward, avg_house_reward
+        avg_mean_tax = total_mean_tax / self.args.eval_episodes
+        avg_mean_wealth = total_mean_wealth / self.args.eval_episodes
+        avg_mean_post_income = total_mean_post_income / self.args.eval_episodes
+        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income
 
 
 

@@ -121,23 +121,49 @@ class SharedCritic(nn.Module):   # Q(s, a_g, a_h, \bar{a_h})
 '''
 v0: government actor no GRU
 '''
-class Actor(nn.Module):
+# class Actor(nn.Module):
+#     def __init__(self, input_dims, action_dims, hidden_size, log_std_min, log_std_max):
+#         super(Actor, self).__init__()
+#         self.fc1 = nn.Linear(input_dims, hidden_size)
+#         self.fc2 = nn.Linear(hidden_size, hidden_size)
+#         self.mean = nn.Linear(hidden_size, action_dims)
+#         self.log_std = nn.Linear(hidden_size, action_dims)
+#         # the log_std_min and log_std_max
+#         self.log_std_min = log_std_min
+#         self.log_std_max = log_std_max
+#
+#     def forward(self, obs):
+#         x = F.relu(self.fc1(obs))
+#         x = F.relu(self.fc2(x))
+#         mean = self.mean(x)
+#         log_std = self.log_std(x)
+#         # clamp the log std
+#         log_std = torch.clamp(log_std, min=self.log_std_min, max=self.log_std_max)
+#
+#         return (mean, torch.exp(log_std))
+
+class Actor(nn.Module):  # pi(s)  没有 mean action
+    # scale the network
     def __init__(self, input_dims, action_dims, hidden_size, log_std_min, log_std_max):
         super(Actor, self).__init__()
-        self.fc1 = nn.Linear(input_dims, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.mean = nn.Linear(hidden_size, action_dims)
-        self.log_std = nn.Linear(hidden_size, action_dims)
+        self.fc1 = nn.Linear(input_dims, 128)  # pi(observation, gov_a, top10_action, bot50_action)
+        self.gru = GRU(128, 256, 1, 0.1)
+        self.fc2 = nn.Linear(256, 128)
+        self.tanh = nn.Tanh()
+        self.mean = nn.Linear(128, action_dims)
+        self.log_std = nn.Linear(128, action_dims)
         # the log_std_min and log_std_max
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
 
+
     def forward(self, obs):
-        x = F.relu(self.fc1(obs))
-        x = F.relu(self.fc2(x))
-        mean = self.mean(x)
-        log_std = self.log_std(x)
-        # clamp the log std
+        out = self.fc1(obs)
+        out = self.gru(out)
+        out = self.fc2(out)
+        out = self.tanh(out)
+        mean = self.mean(out).squeeze(1)
+        log_std = self.log_std(out).squeeze(1)
         log_std = torch.clamp(log_std, min=self.log_std_min, max=self.log_std_max)
 
         return (mean, torch.exp(log_std))
@@ -148,6 +174,8 @@ class GRU(nn.Module):
         self.gru = nn.GRU(input_size, hidden_size, num_layers, dropout=dropout, batch_first=True)
 
     def forward(self, x):
+        if x.ndim == 2:
+            x = x.unsqueeze(1)
         out, _ = self.gru(x)
         return out
 
@@ -322,3 +350,109 @@ class mlp_net(nn.Module):
         pi = (mean, sigma)
 
         return state_value, pi
+
+
+class BMF_actor(nn.Module):
+    def __init__(self, input_size, gov_action_dim, house_action_dim, num_agent, log_std_min, log_std_max):
+        super(BMF_actor, self).__init__()
+        self.fc1 = nn.Linear(input_size+gov_action_dim+house_action_dim*2, 64)  # pi(observation, gov_a, top10_action, bot50_action)
+        self.gru = GRU(64, 128, 1, 0.1)
+        self.fc2 = nn.Linear(128, 64)
+        self.tanh = nn.Tanh()
+        self.mean = nn.Linear(64, house_action_dim)
+        self.log_std = nn.Linear(64, house_action_dim)
+        # the log_std_min and log_std_max
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
+        self.num_agent = num_agent
+
+    def forward(self, global_state, private_state, gov_action, past_mean_house_action, update=False):
+        if update == True:
+            global_state = global_state.unsqueeze(1)
+            gov_action = gov_action.unsqueeze(1)
+            past_mean_house_action = past_mean_house_action.unsqueeze(1)
+
+        n_global_obs = global_state.repeat(1, self.num_agent, 1)
+        n_gov_action = gov_action.repeat(1, self.num_agent, 1)
+        n_past_mean_house_action = past_mean_house_action.repeat(1, self.num_agent, 1)
+        inputs = torch.cat([n_global_obs, private_state, n_gov_action, n_past_mean_house_action], dim=-1)
+        out = self.fc1(inputs)
+        out = self.gru(out)
+        out = self.fc2(out)
+        out = self.tanh(out)
+        mean = self.mean(out)
+        log_std = self.log_std(out)
+        log_std = torch.clamp(log_std, min=self.log_std_min, max=self.log_std_max)
+
+        return (mean, torch.exp(log_std))
+
+class BMF_actor_1(nn.Module):  # pi(s)  没有 mean action
+    # def __init__(self, input_size, gov_action_dim, house_action_dim, num_agent, log_std_min, log_std_max):
+    #     super(BMF_actor_1, self).__init__()
+    #     self.fc1 = nn.Linear(input_size+gov_action_dim, 64)  # pi(observation, gov_a, top10_action, bot50_action)
+    #     self.gru = GRU(64, 128, 1, 0.1)
+    #     self.fc2 = nn.Linear(128, 64)
+    #     self.tanh = nn.Tanh()
+    #     self.mean = nn.Linear(64, house_action_dim)
+    #     self.log_std = nn.Linear(64, house_action_dim)
+    #     # the log_std_min and log_std_max
+    #     self.log_std_min = log_std_min
+    #     self.log_std_max = log_std_max
+    #     self.num_agent = num_agent
+
+    # scale the network
+    def __init__(self, input_size, gov_action_dim, house_action_dim, num_agent, log_std_min, log_std_max):
+        super(BMF_actor_1, self).__init__()
+        self.fc1 = nn.Linear(input_size+gov_action_dim, 128)  # pi(observation, gov_a, top10_action, bot50_action)
+        self.gru = GRU(128, 256, 1, 0.1)
+        self.fc2 = nn.Linear(256, 128)
+        self.tanh = nn.Tanh()
+        self.mean = nn.Linear(128, house_action_dim)
+        self.log_std = nn.Linear(128, house_action_dim)
+        # the log_std_min and log_std_max
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
+        self.num_agent = num_agent
+
+    def forward(self, global_state, private_state, gov_action, update=False):
+        if update == True:
+            global_state = global_state.unsqueeze(1)
+            gov_action = gov_action.unsqueeze(1)
+
+        n_global_obs = global_state.repeat(1, self.num_agent, 1)
+        n_gov_action = gov_action.repeat(1, self.num_agent, 1)
+        inputs = torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)
+        out = self.fc1(inputs)
+        out = self.gru(out)
+        out = self.fc2(out)
+        out = self.tanh(out)
+        mean = self.mean(out)
+        log_std = self.log_std(out)
+        log_std = torch.clamp(log_std, min=self.log_std_min, max=self.log_std_max)
+
+        return (mean, torch.exp(log_std))
+
+
+class BMF_critic(nn.Module):   # Q(s, a_g, a_h, \bar{a_h})
+    def __init__(self, state_dim, gov_action_dim, hou_action_dim, hidden_size, num_agent):
+        super(BMF_critic, self).__init__()
+        self.fc1 = nn.Linear(state_dim + gov_action_dim + 3*hou_action_dim, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.q_value = nn.Linear(hidden_size, 1)
+        self.num_agent = num_agent
+
+    def forward(self, global_state, private_state, gov_action, hou_action, mean_house_action):
+
+        global_state = global_state.unsqueeze(1)
+        gov_action = gov_action.unsqueeze(1)
+        mean_house_action = mean_house_action.unsqueeze(1)
+
+        n_global_obs = global_state.repeat(1, self.num_agent, 1)
+        n_gov_action = gov_action.repeat(1, self.num_agent, 1)
+        n_mean_house_action = mean_house_action.repeat(1, self.num_agent, 1)
+
+        inputs = torch.cat([n_global_obs, private_state, n_gov_action, hou_action, n_mean_house_action], dim=-1)  # 修改维度
+        x = F.relu(self.fc1(inputs))
+        x = F.relu(self.fc2(x))
+        output = self.q_value(x)
+        return output

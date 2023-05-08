@@ -40,10 +40,14 @@ class economic_society:
         self.episode_years = env_args['episode_years']
         self.year_per_step = env_args['year_per_step']
         self.consumption_tax_rate = env_args['consumption_tax_rate']
-        self.episode_length = self.episode_years/self.year_per_step
+        self.gini_weight = env_args['gini_weight']
+        # self.episode_length = self.episode_years/self.year_per_step
+        self.episode_length = 200
         self.step_cnt = 0
+        self.xi_max = 0.1
 
         global_obs, private_obs = self.reset()
+        self.olg_GDP = copy.copy(self.GDP)
 
         self.government.observation_space = Box(
             low=-np.inf, high=np.inf, shape=(global_obs.shape[0],), dtype=np.float32
@@ -69,25 +73,26 @@ class economic_society:
         self.Lt = np.sum(self.households.e * self.ht)
         # Equilibrium
         self.WageRate = (1 - self.alpha) * np.power(self.Kt/self.Lt, self.alpha)
+        # capital-labor ratio =  (self.alpha / self.interest_rate)**(1/(1-self.alpha))
 
     def generate_gdp(self):
         # C + X + G  = Yt = sum(labor_income) + Rt*Kt
         gdp = (self.Kt ** self.alpha) * (self.Lt ** (1-self.alpha))
+        self.per_household_gdp = gdp / self.households.n_households
         return gdp
 
     def action_wrapper(self, actions):
         '''
         input: (-1,1)之间
-        output: (0.1, 0.9)
+        output: (0, 0.9999)
         '''
-        new_action = (actions+1)/2
-        return np.clip(new_action, 0.001, 0.9)
+        return np.clip((actions+1)/2, 0, 0.999)
 
     def workinghours_wrapper(self, ht):
         return self.hours_max * ht
 
-
     def step(self, action_dict):
+        self.old_per_gdp = copy.copy(self.per_household_gdp)
         self.valid_action_dict = self.is_valid(action_dict)
 
         # update
@@ -97,9 +102,12 @@ class economic_society:
         self.households.at = copy.copy(self.households.at_next)
 
         self.government.tau, self.government.xi, self.government.tau_a, self.government.xi_a, self.Gt_prob, self.Bt2At = self.action_wrapper(self.valid_action_dict[self.government.name])
+        self.government.xi *= self.xi_max
+        self.government.xi_a *= self.xi_max
+
         # households action
         multi_actions = self.action_wrapper(self.valid_action_dict[self.households.name])
-        saving_p = np.array(multi_actions[:, 0])[:,np.newaxis,...]
+        saving_p = np.array(multi_actions[:, 0])[:,np.newaxis,...] * 0.5 + 0.5
         self.workingHours = np.array(multi_actions[:, 1])[:,np.newaxis,...]
         self.ht = self.workinghours_wrapper(self.workingHours)
 
@@ -112,52 +120,70 @@ class economic_society:
         self.income = self.WageRate * self.households.e * self.ht + self.interest_rate * self.households.at
         income_tax, asset_tax = self.tax_function(self.income, self.households.at)
 
-        post_income = self.income - income_tax
+        self.post_income = self.income - income_tax
         post_asset = self.households.at - asset_tax
-        total_wealth = post_income + post_asset
+        total_wealth = self.post_income + post_asset
 
         # compute tax
         aggregate_consumption = (1 - saving_p) * total_wealth
         choose_consumption = 1/(1 + self.consumption_tax_rate) * aggregate_consumption
-        c_scale_range = (self.GDP - Gt)/(np.sum(choose_consumption))
-        if c_scale_range >= 1:
-            self.consumption = choose_consumption
-        else:
-            self.consumption = c_scale_range * choose_consumption
+        # todo  Yt 首先满足Ct
+        # c_scale_range = self.GDP / (np.sum(choose_consumption))
+        # if c_scale_range > 1:  # GDP > C_t
+        #     self.consumption = choose_consumption
+        #     if Gt > (self.GDP - np.sum(self.consumption)):
+        #         Gt = self.GDP - np.sum(self.consumption)
+        # else:  # GDP < C_t
+        #     self.consumption = c_scale_range * choose_consumption
+        # todo 如果GDP满足不了人们消费，就结束
+        if np.sum(choose_consumption) + Gt > self.GDP:
+            self.done = True
+        self.consumption = choose_consumption
 
         consumption_tax = self.consumption * self.consumption_tax_rate
         self.households.at_next = total_wealth - self.consumption * (1+self.consumption_tax_rate)
         self.tax_array = income_tax + asset_tax + consumption_tax
 
-        self.Bt_next = self.Bt2At * np.sum(self.households.at_next)
-        self.Kt_next = (1-self.Bt2At) * np.sum(self.households.at_next)
-        lump_sum_transfer = self.Bt_next + np.sum(self.tax_array) - (1 + self.interest_rate) * self.Bt - Gt
-        self.households.at_next += self.households.at_next/np.sum(self.households.at_next)*lump_sum_transfer
+        self.Bt_next = (1 + self.interest_rate) * self.Bt + Gt - np.sum(self.tax_array)
+
+        self.Kt_next = np.sum(self.households.at_next) - self.Bt_next
 
         # next state
         next_global_state, next_private_state = self.get_obs()
         # terminal
         self.wealth_gini = self.gini_coef(self.households.at_next)
-        self.income_gini = self.gini_coef(post_income)
+        self.income_gini = self.gini_coef(self.post_income)
 
         # reward
         self.households_reward = self.utility_function(self.consumption, self.ht)
-        # self.government_reward = np.mean(self.households_reward, axis=0)
-        # todo 将GDP当作government objective
-        self.government_reward = self.GDP /  self.wealth_gini * self.income_gini
-        self.done = bool(self.wealth_gini > 0.8 or math.isnan(self.government_reward))
-        if math.isnan(self.government_reward):
+        self.government_reward = self.gov_reward()
+        # 如果gini>0.8, 有人破产， GDP过低 都会结束
+        self.done = self.done or bool(self.wealth_gini > 0.8 or self.income_gini>0.8 or math.isnan(self.government_reward) or math.isnan(np.mean(self.households_reward)) or np.min(self.households.at_next) < 0)
+        # self.done = bool(self.wealth_gini > 0.8 or math.isnan(self.government_reward) or np.min(self.households.at_next) < 0)
+        if math.isnan(self.government_reward) or math.isnan(np.mean(self.households_reward)):
             self.ht = self.workinghours_wrapper(np.ones((self.households.n_households, 1)))
             self.consumption = np.zeros((self.households.n_households, 1)) + 0.001
             self.households_reward = self.utility_function(self.consumption, self.ht)
-            self.government_reward = np.mean(self.households_reward, axis=0)
+            self.government_reward = self.gov_reward()
+            next_global_state = None
+            next_private_state = None
 
         self.step_cnt += 1
-
         self.done = self.is_terminal()
 
         return next_global_state, next_private_state, self.government_reward, self.households_reward, self.done
 
+    def gov_reward(self):
+        '''人均GDP增长率 - weight * gini'''
+        gov_goal = "gdp_gini"
+        if gov_goal == "gdp":
+            return (self.per_household_gdp - self.old_per_gdp) / self.old_per_gdp
+        elif gov_goal == "gini":
+            return - (self.wealth_gini * self.income_gini)
+        elif gov_goal == "social_welfare":
+            return np.sum(self.households_reward)
+        elif gov_goal == "gdp_gini":
+            return (self.per_household_gdp - self.old_per_gdp) / self.old_per_gdp - self.gini_weight * (self.wealth_gini * self.income_gini)
 
     def is_valid(self, action_dict):
         return action_dict
@@ -172,50 +198,62 @@ class economic_society:
             return False
 
     def reset(self, **custom_cfg):
+        self.step_cnt = 0
         self.government.reset()
         self.households.reset()
-        self.Kt_next = np.sum(self.households.at_next) * 0.5
-        self.Bt_next = np.sum(self.households.at_next) * 0.5
+        self.Kt_next = np.sum(self.households.at_next) * 0.8
+        self.Bt_next = np.sum(self.households.at_next) * 0.2
         self.done = False
 
         self.Kt = copy.copy(self.Kt_next)
         self.workingHours = np.ones((self.households.n_households,1))/3
         self.ht = self.workinghours_wrapper(self.workingHours)
         self.MarketClear()
+        self.GDP = self.generate_gdp()
         self.income = self.households.e * self.ht
 
+        # self.display_mode = False
         self.display_mode = False
         return self.get_obs()
 
     def get_obs(self):
         '''
         v0:
-            global state: income_mean, income_std, asset_mean, asset_std, wage_rate, rent_rate
+            global state: top 10 mean income, top 10 mean asset, top 10 mean e, bottom 50 mean income, bottom 50 mean asset, bottom 50 mean e, wagerate
             private state: e, a
         '''
         income = self.income
         wealth = self.households.at_next
-        income_mean = np.mean(income)
-        income_std = np.std(income)
+        sorted_income_index = sorted(range(len(income)), key=lambda k: income[k], reverse=True)
+        top10_income_index = sorted_income_index[:int(0.1*self.households.n_households)]
+        bottom50_income_index = sorted_income_index[int(0.5*self.households.n_households):]
+        top10_income = income[top10_income_index]
+        top10_e = self.households.e[top10_income_index]
+        bot50_income = income[bottom50_income_index]
+        bot50_e = self.households.e[bottom50_income_index]
 
-        asset_mean = np.mean(wealth)
-        asset_std = np.std(wealth)
+        sorted_wealth_index = sorted(range(len(wealth)), key=lambda k: wealth[k], reverse=True)
+        top10_wealth_index = sorted_wealth_index[:int(0.1*self.households.n_households)]
+        bottom50_wealth_index = sorted_wealth_index[int(0.5*self.households.n_households):]
+        top10_wealth = wealth[top10_wealth_index]
+        bot50_wealth = wealth[bottom50_wealth_index]
 
-        global_obs = np.array([income_mean, income_std, asset_mean, asset_std, self.WageRate, self.Kt, self.Lt])
+        global_obs = np.array([np.mean(top10_wealth), np.mean(top10_income), np.mean(top10_e), np.mean(bot50_wealth), np.mean(bot50_income), np.mean(bot50_e), self.WageRate])
         private_obs = np.concatenate((self.households.e, wealth), -1)
-
         return global_obs, private_obs
 
     def utility_function(self, c_t, h_t):
         # life-time CRRA utility
         if 1-self.households.CRRA == 0:
+            # if np.min(c_t) < 0:
+            #     print(1)
             u_c = np.log(c_t)
         else:
             u_c = c_t ** (1 - self.households.CRRA) / (1 - self.households.CRRA)
         if 1 + self.households.IFE == 0:
             u_h = np.log(h_t)
         else:
-            u_h = ((h_t/1000)**(1 + self.households.IFE)/(1 + self.households.IFE))
+            u_h = ((h_t/40000)**(1 + self.households.IFE)/(1 + self.households.IFE))
         current_utility = u_c - u_h
         return current_utility
 
@@ -230,6 +268,7 @@ class economic_society:
         B = np.trapz(yarray, x=xarray)
         A = 0.5 - B
         return A / (A + B)
+
 
     def tax_function(self, income, asset):
         # x: input
@@ -262,7 +301,7 @@ class economic_society:
         debug("Income Gini: "+"{:.3g}".format(self.income_gini), x=348, y=50)
         debug('GDP: '+"{:.3g}".format(self.GDP), x=390, y=70)
 
-        gov_img = pygame.transform.scale(self.gov_img, size=(50, 50))
+        gov_img = pygame.transform.scale(self.gov_img,(50, 50))
         self.background.blit(gov_img, [100,100])
         debug("Tau: "+"{:.3g}".format(self.government.tau), x=10, y=80)
         debug("Xi: "+"{:.3g}".format(self.government.xi), x=10, y=100)
@@ -271,14 +310,14 @@ class economic_society:
         debug("Gt_prob: "+"{:.3g}".format(self.Gt_prob), x=10, y=160)
         debug("Bt2At: "+"{:.3g}".format(self.Bt2At), x=10, y=180)
 
-        house_img = pygame.transform.scale(self.house_img, size=(50, 50))
+        house_img = pygame.transform.scale(self.house_img, (50, 50))
         self.background.blit(house_img, [200,400])
         self.background.blit(house_img, [160,400])
         self.background.blit(house_img, [180,440])
         debug("Mean Working Hours: "+"{:.3g}".format(self.workingHours.mean()), x=250, y=450)
         debug("Mean Saving Prop: "+"{:.3g}".format(self.mean_saving_p), x=250, y=470)
 
-        firm_img = pygame.transform.scale(self.firm_img, size=(50,50))
+        firm_img = pygame.transform.scale(self.firm_img, (50,50))
         self.background.blit(firm_img, [400,170])
         debug("Wage Rate: "+"{:.3g}".format(self.WageRate), x=370, y=230)
 
@@ -286,7 +325,7 @@ class economic_society:
         pygame.draw.line(self.background, COLORS['blue'], (220,390), (390, 210), width=10)
         pygame.draw.line(self.background, COLORS['blue'], (160,130), (390, 180), width=10)
 
-        bank_img = pygame.transform.scale(self.bank_img, size=(50,50))
+        bank_img = pygame.transform.scale(self.bank_img, (50,50))
         self.background.blit(bank_img, [230,200])
 
         pygame.draw.line(self.background, COLORS['blue'], (145,145), (225, 195), width=10)

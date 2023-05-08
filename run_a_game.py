@@ -8,7 +8,7 @@ import os
 from omegaconf import OmegaConf
 
 
-yaml_cfg = OmegaConf.load(f'/home/yansong/Desktop/jidiai/AI-TaxingPolicy/cfg/default.yaml')
+yaml_cfg = OmegaConf.load(f'D:\\code\\AI-TaxingPolicy\\AI-TaxingPolicy\\cfg\\default.yaml')
 yaml_cfg.Trainer["n_households"] = 1000
 yaml_cfg.Environment.Entities[1]["entity_args"].n = 1000
 

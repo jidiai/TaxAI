@@ -54,7 +54,7 @@ class replay_buffer:
         else:
             self.storge[self.next_idx] = data
         # get the next idx
-        self.next_idx = (self.next_idx + 1) % self.memory_size
+        self.next_idx = int((self.next_idx + 1) % self.memory_size)
 
     # encode samples
     def mf_encode_sample(self, idx):

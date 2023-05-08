@@ -1,0 +1,51 @@
+{
+    "os": "Windows-10-10.0.23451-SP0",
+    "python": "3.9.16",
+    "heartbeatAt": "2023-05-08T08:07:45.190342",
+    "startedAt": "2023-05-08T08:07:12.534479",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--device-num",
+        "0",
+        "--n_households",
+        "100",
+        "--alg",
+        "ppo"
+    ],
+    "state": "running",
+    "program": "D:\\code\\AI-TaxingPolicy\\AI-TaxingPolicy\\main.py",
+    "codePath": "main.py",
+    "host": "RICE-PC",
+    "username": "LENOVO",
+    "executable": "C:\\Users\\LENOVO\\anaconda3\\envs\\paper\\python.exe",
+    "cpu_count": 6,
+    "cpu_count_logical": 12,
+    "cpu_freq": {
+        "current": 2500.0,
+        "min": 0.0,
+        "max": 2500.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2500.0,
+            "min": 0.0,
+            "max": 2500.0
+        }
+    ],
+    "disk": {
+        "total": 274.71581649780273,
+        "used": 60.57857131958008
+    },
+    "gpu": "NVIDIA GeForce RTX 3060",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce RTX 3060",
+            "memory_total": 12884901888
+        }
+    ],
+    "memory": {
+        "total": 31.79241943359375
+    }
+}

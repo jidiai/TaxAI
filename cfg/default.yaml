@@ -8,12 +8,12 @@ Environment:
     - entity_name: 'government'
       entity_args:
         n: 1            #number of government
-        tau: 0.263
-        xi: 0.049
-        tau_a: 0
-        xi_a: 0
-        G: 0
-        G_scale: 10
+#        tau: 0.263
+#        xi: 0.049
+#        tau_a: 0
+#        xi_a: 0
+#        Gt_prob: 0.189
+#        G_scale: 10
         action_shape: 6
 
     - entity_name: 'household'
@@ -44,7 +44,8 @@ Environment:
       depreciation_rate: 0.06
       consumption_tax_rate: 0.065
       interest_rate: 0.04
-      hours_max: 7093
+      hours_max: 283720               # 7093 * 40
+      gini_weight: 1
 
 
 Trainer:
@@ -58,7 +59,7 @@ Trainer:
   buffer_size:  1e6
   env_name: 'wealth_distribution'
   init_exploration_policy:  'gaussian'
-  n_epochs: 3000
+  n_epochs: 1000
   epoch_length: 1000
   update_cycles:  10
   target_update_interval: 1
@@ -68,6 +69,17 @@ Trainer:
   tau:  5e-3
   eval_episodes: 10
   init_exploration_steps: 1000
+  ppo_tau: 0.95
+  ppo_gamma: 0.99
+  eps: 1e-5
+  update_epoch: 10
+  clip: 0.1
+  vloss_coef: 0.5
+  ent_coef: 0.01
+  max_grad_norm: 0.5
+  update_freq: 100
+  initial_train: 2000
+
 
 
 

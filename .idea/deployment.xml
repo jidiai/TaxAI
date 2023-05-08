@@ -3,6 +3,13 @@
   <component name="PublishConfigData" autoUpload="Always" serverName="mqr@172.18.116.170:22" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeUploading="false">
     <option name="confirmBeforeUploading" value="false" />
     <serverData>
+      <paths name="mqr@172.18.113.34">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/mqr/code/AI-TaxingPolicy" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="mqr@172.18.116.170:22">
         <serverdata>
           <mappings>
@@ -17,21 +24,7 @@
           </mappings>
         </serverdata>
       </paths>
-      <paths name="mqr@172.18.80.25:22">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
       <paths name="qirui@10.0.114.31:22">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="qirui@172.18.116.178:22">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
