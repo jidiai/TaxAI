@@ -42,7 +42,7 @@ class economic_society:
         self.consumption_tax_rate = env_args['consumption_tax_rate']
         self.gini_weight = env_args['gini_weight']
         # self.episode_length = self.episode_years/self.year_per_step
-        self.episode_length = 200
+        self.episode_length = 300
         self.step_cnt = 0
         self.xi_max = 0.1
 
@@ -92,8 +92,9 @@ class economic_society:
         return self.hours_max * ht
 
     def step(self, action_dict):
+        if self.step_cnt == 100:
+            print(1)
         self.old_per_gdp = copy.copy(self.per_household_gdp)
-        self.valid_action_dict = self.is_valid(action_dict)
 
         # update
         self.households.generate_e_ability()
@@ -161,12 +162,13 @@ class economic_society:
         self.done = self.done or bool(self.wealth_gini > 0.8 or self.income_gini>0.8 or math.isnan(self.government_reward) or math.isnan(np.mean(self.households_reward)) or np.min(self.households.at_next) < 0)
         # self.done = bool(self.wealth_gini > 0.8 or math.isnan(self.government_reward) or np.min(self.households.at_next) < 0)
         if math.isnan(self.government_reward) or math.isnan(np.mean(self.households_reward)):
+            self.done = True
             self.ht = self.workinghours_wrapper(np.ones((self.households.n_households, 1)))
             self.consumption = np.zeros((self.households.n_households, 1)) + 0.001
             self.households_reward = self.utility_function(self.consumption, self.ht)
             self.government_reward = self.gov_reward()
-            next_global_state = None
-            next_private_state = None
+            next_global_state = np.zeros(self.government.observation_space.shape[0])
+            next_private_state = np.zeros((self.households.n_households, self.households.observation_space.shape[0]-self.government.observation_space.shape[0]))
 
         self.step_cnt += 1
         self.done = self.is_terminal()
@@ -175,7 +177,7 @@ class economic_society:
 
     def gov_reward(self):
         '''人均GDP增长率 - weight * gini'''
-        gov_goal = "gdp_gini"
+        gov_goal = "gdp"
         if gov_goal == "gdp":
             return (self.per_household_gdp - self.old_per_gdp) / self.old_per_gdp
         elif gov_goal == "gini":

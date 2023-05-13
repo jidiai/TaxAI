@@ -119,7 +119,7 @@ class rule_agent:
                 episode_gdp.append(self.eval_env.per_household_gdp)
                 episode_income_gini.append(self.eval_env.income_gini)
                 episode_wealth_gini.append(self.eval_env.wealth_gini)
-
+                self.eval_env.render()
                 # if done and self.eval_env.step_cnt < self.eval_env.episode_length:
                 if done:
                     break
@@ -142,9 +142,9 @@ class rule_agent:
         return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, mean_step
 
     def _evaluate_get_action(self, global_obs, private_obs):
-        # gov_action = np.array([0.263, 0.049, 0.2, 0.05, 0.189, 0.2])
-        gov_action = np.array([0.263, 0.049, 0, 0, 0.189, 0.2])
-        # gov_action = np.array([0., 0., 0, 0, 0.189, 0.2])
+        # gov_action = np.array([0.263, 0.049, 0.2, 0.05, 0.189, 0.8])
+        gov_action = np.array([0.263, 0.049, 0, 0, 0.189, 0.8])
+        # gov_action = np.array([0., 0., 0, 0, 0.189, 0.8])
         temp = np.zeros((self.args.n_households, 2))
         temp[:, 0] = 0.9
         temp[:, 1] = 1 / 3
