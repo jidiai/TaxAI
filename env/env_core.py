@@ -9,6 +9,7 @@ import copy
 import pygame
 import sys
 import os
+import inspect
 
 from pathlib import Path
 ROOT_PATH = str(Path(__file__).resolve().parent.parent)
@@ -67,6 +68,13 @@ class economic_society:
     def observation_spaces(self):
         return {self.households.name: self.households.observation_space,
                 self.government.name: self.government.observation_space}
+
+    # 获取类的参数
+    def get_class_parameters(self, cls):
+        signature = inspect.signature(cls.__init__)
+        parameters = signature.parameters
+        param_names = [param_name for param_name in parameters.keys() if param_name != 'self']
+        return param_names
 
     def MarketClear(self):
         # aggregate labor

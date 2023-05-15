@@ -1,8 +1,0 @@
-
-n_households:  100
-Traceback (most recent call last):
-  File "D:\code\AI-TaxingPolicy\AI-TaxingPolicy\main.py", line 65, in <module>
-    trainer.learn()
-  File "D:\code\AI-TaxingPolicy\AI-TaxingPolicy\agents\independent_ppo.py", line 165, in learn
-    mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini = self._evaluate_agent()
-ValueError: too many values to unpack (expected 8)
