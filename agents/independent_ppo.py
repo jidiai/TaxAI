@@ -27,7 +27,7 @@ class ppo_agent:
         self.eval_env = copy.copy(envs)
         self.args = args
         # start to build the network.
-        self.households_net = mlp_net(self.envs.households.observation_space.shape[0], self.envs.households.action_space.shape[0])
+        self.households_net = mlp_net(self.envs.households.observation_space.shape[0], self.envs.households.action_space.shape[1])
         self.households_old_net = copy.deepcopy(self.households_net)
         # if use the cuda...
         if self.args.cuda:
@@ -98,7 +98,7 @@ class ppo_agent:
                 # select actions
                 house_actions = select_actions(pis)
                 input_actions = self.action_wrapper(house_actions)
-                gov_action = np.array([0.263, 0.049, 0, 0, 0.189, 0.8])
+                gov_action = np.array([0.263, 0.049, 0, 0, 0.189])
                 # gov_action = np.array([0.263, 0.049, 0.02, 0, 0.189, 0.4])
 
                 action = {self.envs.government.name: self.gov_action_max * (gov_action * 2 - 1),
@@ -152,7 +152,7 @@ class ppo_agent:
             mb_returns = mb_advs + mb_values
             # after compute the returns, let's process the rollouts
             mb_obs = mb_obs.swapaxes(0, 1).reshape(self.batch_ob_shape)
-            mb_actions = mb_actions.swapaxes(0, 1).reshape(-1, self.envs.households.action_space.shape[0])
+            mb_actions = mb_actions.swapaxes(0, 1).reshape(-1, self.envs.households.action_space.shape[1])
 
             mb_returns = mb_returns.swapaxes(0, 1).flatten()
             mb_advs = mb_advs.swapaxes(0, 1).flatten()
@@ -361,7 +361,7 @@ class ppo_agent:
         # select actions
         house_actions = select_actions(pis)
         input_actions = self.action_wrapper(house_actions)
-        gov_action = np.array([0.263, 0.049, 0, 0, 0.189, 0.8])
+        gov_action = np.array([0.263, 0.049, 0, 0, 0.189])
 
         action = {self.envs.government.name: self.gov_action_max * (gov_action * 2 - 1),
                   self.envs.households.name: self.hou_action_max * (input_actions * 2 - 1)}

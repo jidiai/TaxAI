@@ -4,6 +4,7 @@ standard evaluation function
 
 import numpy as np
 import torch
+import inspect
 
 def _evaluate_agent(env, eval_episodes):
     total_gov_reward = 0
@@ -67,3 +68,25 @@ def _evaluate_get_action(global_obs, private_obs):
     # action = {self.eval_env.government.name: self.gov_action_max * (gov_action * 2 - 1),
     #           self.eval_env.households.name: self.hou_action_max * hou_action}
     # return action
+
+
+# 获取类的参数
+def get_class_parameters(cls):
+    parameters = {}
+    for param_name, param_value in cls.__dict__.items():
+        if not param_name.startswith('__') and not inspect.ismethod(param_value):
+            parameters[param_name] = param_value
+    return parameters
+
+'''save parameters'''
+def save_parameters(path, step, epoch, cls):
+
+    parameters = get_class_parameters(cls)
+    file_path = str(path) + '/epoch_' + str(epoch) + 'step_' + str(step) + '_parameters.txt'
+
+    # 将参数保存到文件
+    with open(file_path, 'w') as file:
+        for param_name, param_value in parameters.items():
+            file.write(f"{param_name}: {param_value}\n")
+
+    print(f"参数已保存到文件: {file_path}")

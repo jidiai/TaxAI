@@ -42,13 +42,14 @@ class economic_society:
         self.year_per_step = env_args['year_per_step']
         self.consumption_tax_rate = env_args['consumption_tax_rate']
         self.gini_weight = env_args['gini_weight']
+        self.gov_obj = env_args['gov_obj']
         # self.episode_length = self.episode_years/self.year_per_step
         self.episode_length = 300
         self.step_cnt = 0
-        self.xi_max = 0.1
+        self.xi_max = 0.05
+        self.tau_max = 0.2
 
         global_obs, private_obs = self.reset()
-        self.olg_GDP = copy.copy(self.GDP)
 
         self.government.observation_space = Box(
             low=-np.inf, high=np.inf, shape=(global_obs.shape[0],), dtype=np.float32
@@ -68,13 +69,6 @@ class economic_society:
     def observation_spaces(self):
         return {self.households.name: self.households.observation_space,
                 self.government.name: self.government.observation_space}
-
-    # 获取类的参数
-    def get_class_parameters(self, cls):
-        signature = inspect.signature(cls.__init__)
-        parameters = signature.parameters
-        param_names = [param_name for param_name in parameters.keys() if param_name != 'self']
-        return param_names
 
     def MarketClear(self):
         # aggregate labor
@@ -100,9 +94,8 @@ class economic_society:
         return self.hours_max * ht
 
     def step(self, action_dict):
-        if self.step_cnt == 100:
-            print(1)
         self.old_per_gdp = copy.copy(self.per_household_gdp)
+        self.valid_action_dict = self.is_valid(action_dict)
 
         # update
         self.households.generate_e_ability()
@@ -110,9 +103,12 @@ class economic_society:
         self.Bt = copy.copy(self.Bt_next)
         self.households.at = copy.copy(self.households.at_next)
 
-        self.government.tau, self.government.xi, self.government.tau_a, self.government.xi_a, self.Gt_prob, self.Bt2At = self.action_wrapper(self.valid_action_dict[self.government.name])
+        self.government.tau, self.government.xi, self.government.tau_a, self.government.xi_a, self.Gt_prob = self.action_wrapper(self.valid_action_dict[self.government.name])
         self.government.xi *= self.xi_max
         self.government.xi_a *= self.xi_max
+        self.government.tau *= self.tau_max
+        self.government.tau_a *= self.tau_max
+        self.Gt_prob *= 0.3
 
         # households action
         multi_actions = self.action_wrapper(self.valid_action_dict[self.households.name])
@@ -124,6 +120,7 @@ class economic_society:
         # market clear
         self.MarketClear()
         self.GDP = self.generate_gdp()
+        # self.GDP - (self.alpha * (self.Kt/self.Lt)**(self.alpha-1) * self.Kt + self.WageRate * self.Lt)
         Gt = self.Gt_prob * self.GDP
 
         self.income = self.WageRate * self.households.e * self.ht + self.interest_rate * self.households.at
@@ -136,15 +133,7 @@ class economic_society:
         # compute tax
         aggregate_consumption = (1 - saving_p) * total_wealth
         choose_consumption = 1/(1 + self.consumption_tax_rate) * aggregate_consumption
-        # todo  Yt 首先满足Ct
-        # c_scale_range = self.GDP / (np.sum(choose_consumption))
-        # if c_scale_range > 1:  # GDP > C_t
-        #     self.consumption = choose_consumption
-        #     if Gt > (self.GDP - np.sum(self.consumption)):
-        #         Gt = self.GDP - np.sum(self.consumption)
-        # else:  # GDP < C_t
-        #     self.consumption = c_scale_range * choose_consumption
-        # todo 如果GDP满足不了人们消费，就结束
+
         if np.sum(choose_consumption) + Gt > self.GDP:
             self.done = True
         self.consumption = choose_consumption
@@ -152,10 +141,9 @@ class economic_society:
         consumption_tax = self.consumption * self.consumption_tax_rate
         self.households.at_next = total_wealth - self.consumption * (1+self.consumption_tax_rate)
         self.tax_array = income_tax + asset_tax + consumption_tax
-
         self.Bt_next = (1 + self.interest_rate) * self.Bt + Gt - np.sum(self.tax_array)
-
         self.Kt_next = np.sum(self.households.at_next) - self.Bt_next
+        # np.sum(self.households.at_next) - self.Bt_next + (self.alpha * (self.Kt/self.Lt)**(self.alpha-1)+1-self.depreciation_rate ) *self.Kt + (1+self.interest_rate) *(self.Bt - np.sum(self.households.at))
 
         # next state
         next_global_state, next_private_state = self.get_obs()
@@ -167,8 +155,8 @@ class economic_society:
         self.households_reward = self.utility_function(self.consumption, self.ht)
         self.government_reward = self.gov_reward()
         # 如果gini>0.8, 有人破产， GDP过低 都会结束
-        self.done = self.done or bool(self.wealth_gini > 0.8 or self.income_gini>0.8 or math.isnan(self.government_reward) or math.isnan(np.mean(self.households_reward)) or np.min(self.households.at_next) < 0)
-        # self.done = bool(self.wealth_gini > 0.8 or math.isnan(self.government_reward) or np.min(self.households.at_next) < 0)
+        self.done = self.done or bool(self.wealth_gini > 0.9 or self.income_gini>0.9 or math.isnan(self.government_reward) or math.isnan(np.mean(self.households_reward)) or np.min(self.households.at_next) < 0 or self.Bt_next <0 or self.Kt_next < 0)
+
         if math.isnan(self.government_reward) or math.isnan(np.mean(self.households_reward)):
             self.done = True
             self.ht = self.workinghours_wrapper(np.ones((self.households.n_households, 1)))
@@ -180,12 +168,11 @@ class economic_society:
 
         self.step_cnt += 1
         self.done = self.is_terminal()
-
         return next_global_state, next_private_state, self.government_reward, self.households_reward, self.done
 
     def gov_reward(self):
         '''人均GDP增长率 - weight * gini'''
-        gov_goal = "gdp"
+        gov_goal = self.gov_obj
         if gov_goal == "gdp":
             return (self.per_household_gdp - self.old_per_gdp) / self.old_per_gdp
         elif gov_goal == "gini":
@@ -211,8 +198,8 @@ class economic_society:
         self.step_cnt = 0
         self.government.reset()
         self.households.reset()
-        self.Kt_next = np.sum(self.households.at_next) * 0.8
-        self.Bt_next = np.sum(self.households.at_next) * 0.2
+        self.Kt_next = np.sum(self.households.at_next) * 0.5
+        self.Bt_next = np.sum(self.households.at_next) * 0.5
         self.done = False
 
         self.Kt = copy.copy(self.Kt_next)
@@ -361,31 +348,32 @@ class economic_society:
             pygame.quit()
             self.isopen = False
 
+render=False
+if render:
 
 
+    COLORS = {
+        'red': [255,0,0],
+        'light red': [255, 127, 127],
+        'green': [0, 255, 0],
+        'blue': [0, 0, 255],
+        'orange': [255, 127, 0],
+        'grey':  [176,196,222],
+        'purple': [160, 32, 240],
+        'black': [0, 0, 0],
+        'white': [255, 255, 255],
+        'light green': [204, 255, 229],
+        'sky blue': [0,191,255],
+        # 'red-2': [215,80,83],
+        # 'blue-2': [73,141,247]
+    }
 
-COLORS = {
-    'red': [255,0,0],
-    'light red': [255, 127, 127],
-    'green': [0, 255, 0],
-    'blue': [0, 0, 255],
-    'orange': [255, 127, 0],
-    'grey':  [176,196,222],
-    'purple': [160, 32, 240],
-    'black': [0, 0, 0],
-    'white': [255, 255, 255],
-    'light green': [204, 255, 229],
-    'sky blue': [0,191,255],
-    # 'red-2': [215,80,83],
-    # 'blue-2': [73,141,247]
-}
 
-
-pygame.init()
-font = pygame.font.Font(None, 22)
-def debug(info, y = 10, x=10, c='black'):
-    display_surf = pygame.display.get_surface()
-    debug_surf = font.render(str(info), True, COLORS[c])
-    debug_rect = debug_surf.get_rect(topleft = (x,y))
-    display_surf.blit(debug_surf, debug_rect)
+    pygame.init()
+    font = pygame.font.Font(None, 22)
+    def debug(info, y = 10, x=10, c='black'):
+        display_surf = pygame.display.get_surface()
+        debug_surf = font.render(str(info), True, COLORS[c])
+        debug_rect = debug_surf.get_rect(topleft = (x,y))
+        display_surf.blit(debug_surf, debug_rect)
 

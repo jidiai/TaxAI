@@ -13,6 +13,7 @@ from utils.experience_replay import replay_buffer
 from agents.utils import get_action_info
 from datetime import datetime
 from tensorboardX import SummaryWriter
+from env.evaluation import save_parameters
 # os.environ["SDL_VIDEODRIVER"] = "directfb"
 import pygame
 torch.autograd.set_detect_anomaly(True)
@@ -119,16 +120,22 @@ class rule_agent:
                 episode_gdp.append(self.eval_env.per_household_gdp)
                 episode_income_gini.append(self.eval_env.income_gini)
                 episode_wealth_gini.append(self.eval_env.wealth_gini)
-                self.eval_env.render()
+                # self.eval_env.render()
                 # if done and self.eval_env.step_cnt < self.eval_env.episode_length:
+
+                # '''save variables'''
+                # if self.eval_env.step_cnt == 1 or self.eval_env.step_cnt == 30 or self.eval_env.step_cnt == 100:
+                #     save_parameters(self.model_path, self.eval_env.step_cnt, 1, self.eval_env)
                 if done:
                     break
+
                 global_obs = next_global_obs
                 private_obs = next_private_obs
 
             total_gov_reward += episode_gov_reward
             total_house_reward += episode_mean_house_reward
             total_steps += step_count
+
 
         avg_gov_reward = total_gov_reward / self.args.eval_episodes
         avg_house_reward = total_house_reward / self.args.eval_episodes
@@ -143,8 +150,8 @@ class rule_agent:
 
     def _evaluate_get_action(self, global_obs, private_obs):
         # gov_action = np.array([0.263, 0.049, 0.2, 0.05, 0.189, 0.8])
-        gov_action = np.array([0.263, 0.049, 0, 0, 0.189, 0.8])
-        # gov_action = np.array([0., 0., 0, 0, 0.189, 0.8])
+        # gov_action = np.array([0.05/0.5, 0.0/0.1, 0, 0, 0.1])
+        gov_action = np.array([0., 0., 0, 0, 0.1/0.3])
         temp = np.zeros((self.args.n_households, 2))
         temp[:, 0] = 0.9
         temp[:, 1] = 1 / 3

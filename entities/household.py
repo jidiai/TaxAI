@@ -37,7 +37,7 @@ class Household(BaseEntity):
 
         self.reset()
         self.action_space = Box(
-            low=-1, high=1, shape=(self.action_dim,), dtype=np.float32
+            low=-1, high=1, shape=(self.n_households, self.action_dim), dtype=np.float32
         )
 
 
@@ -113,7 +113,7 @@ class Household(BaseEntity):
         #
         # return np.array(y)[:,np.newaxis, ...]
         real_income, _, asset, _ = self.sample_real_data()
-        return real_income,asset
+        return real_income/1000,asset/1000
 
     def get_real_data(self):
         df = pd.read_csv('agents/cfg/scf2013.csv', header=None)
