@@ -74,7 +74,7 @@ cd AI-TaxingPolicy
 ## Env API
 
 The ai_tax API's API models environments as simple Python `env` classes. Creating environment instances and interacting with them is very simple- here's an example using the "gdp" environment: 
-you can change government task in "./cfg/default.yaml".
+you can change government task in './cfg/default.yaml'.
 ```bash
 gov_task: "gdp"  # choices: {"gdp", "gini", "social_welfare", "gdp_gini"}
 ```

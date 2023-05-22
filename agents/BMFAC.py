@@ -133,13 +133,6 @@ class BMFAC_agent:
         update_index = 0
 
         for epoch in range(self.args.n_epochs):
-            # if epoch < initial_train:
-            #     update_agent = "all"
-            # # else:
-            # #     if (epoch // update_freq) % 2 == 0:
-            # #         update_index = 1 - update_index
-            # #     update_agent = agent_list[update_index]
-            # update_agent = "government"
             if (epoch // update_freq) % 2 == 0 and epoch > initial_train:
                 update_index = 1 - update_index
             update_agent = agent_list[update_index]
