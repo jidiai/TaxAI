@@ -12,7 +12,7 @@ Environment:
 
     - entity_name: 'household'
       entity_args:
-        n: 100
+        n: 10
         consumption_range: 1
         working_hours_range: 24
         CRRA: 1
@@ -40,7 +40,7 @@ Environment:
 
 
 Trainer:
-  n_households: 100
+  n_households: 10
   log_std_min:  -20
   log_std_max:  2
   hidden_size:  256
@@ -51,7 +51,7 @@ Trainer:
   env_name: 'wealth_distribution'
   init_exploration_policy:  'gaussian'
   n_epochs: 5000
-  epoch_length: 1000
+  epoch_length: 500
   update_cycles:  10
   target_update_interval: 1
   display_interval: 1
@@ -70,6 +70,9 @@ Trainer:
   max_grad_norm: 0.5
   update_freq: 100
   initial_train: 100
+  noise_rate: 0.1
+  epsilon: 0.1
+  save_interval: 100
 
 
 

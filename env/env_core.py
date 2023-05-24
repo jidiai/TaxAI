@@ -42,7 +42,7 @@ class economic_society:
         self.year_per_step = env_args['year_per_step']
         self.consumption_tax_rate = env_args['consumption_tax_rate']
         self.gini_weight = env_args['gini_weight']
-        self.gov_obj = env_args['gov_obj']
+        self.gov_task = env_args['gov_task']
         # self.episode_length = self.episode_years/self.year_per_step
         self.episode_length = 300
         self.step_cnt = 0
@@ -172,7 +172,7 @@ class economic_society:
 
     def gov_reward(self):
         '''人均GDP增长率 - weight * gini'''
-        gov_goal = self.gov_obj
+        gov_goal = self.gov_task
         if gov_goal == "gdp":
             return (self.per_household_gdp - self.old_per_gdp) / self.old_per_gdp
         elif gov_goal == "gini":

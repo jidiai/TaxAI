@@ -456,3 +456,4 @@ class BMF_critic(nn.Module):   # Q(s, a_g, a_h, \bar{a_h})
         x = F.relu(self.fc2(x))
         output = self.q_value(x)
         return output
+

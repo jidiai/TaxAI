@@ -8,6 +8,7 @@ from agents.independent_ppo import ppo_agent
 from agents.calibration import calibration_agent
 from agents.MF_bilevel import mf_agent
 from agents.BMFAC import BMFAC_agent
+from agents.MADDPG.MAAC import maddpg_agent
 from utils.seeds import set_seeds
 from arguments import get_args
 import os
@@ -58,6 +59,8 @@ if __name__ == '__main__':
         trainer = ppo_agent(env, yaml_cfg.Trainer)
     elif args.alg == "bmfac":
         trainer = BMFAC_agent(env, yaml_cfg.Trainer)
+    elif args.alg == "maddpg":
+        trainer = maddpg_agent(env, yaml_cfg.Trainer)
     else:
         trainer = calibration_agent(env, yaml_cfg.Trainer)
     # start to learn

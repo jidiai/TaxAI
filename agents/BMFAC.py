@@ -155,14 +155,6 @@ class BMFAC_agent:
                 else:
                     self.fix_gov = False
 
-                # '''hosueholds action'''
-                # temp = np.zeros((self.args.n_households, 2))
-                # temp[:, 0] = 0.9
-                # temp[:, 1] = 1 / 3
-                # temp += np.random.normal(0, 0.01, size=(100, 2))
-                #
-                # hou_action = temp * 2 - 1
-
                 past_mean_house_action = self.multiple_households_mean_action(hou_action)[0]
                 action = {self.envs.government.name: gov_action,
                           self.envs.households.name: hou_action}
