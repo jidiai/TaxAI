@@ -34,7 +34,7 @@ Environment:
       depreciation_rate: 0.06
       consumption_tax_rate: 0.065
       interest_rate: 0.04
-      hours_max: 7093               # 7093 * 40
+      hours_max: 851160               # 7093 * 40 * 30  ensure wealth/income=6.6
       gini_weight: 1
       gov_task: "gdp"  # choices: {"gdp", "gini", "social_welfare", "gdp_gini"}
 
@@ -68,8 +68,8 @@ Trainer:
   vloss_coef: 0.5
   ent_coef: 0.01
   max_grad_norm: 0.5
-  update_freq: 100
-  initial_train: 100
+  update_freq: 1
+  initial_train: 10
   noise_rate: 0.1
   epsilon: 0.1
   save_interval: 100

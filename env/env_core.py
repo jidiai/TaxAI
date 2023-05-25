@@ -108,7 +108,7 @@ class economic_society:
         self.government.xi_a *= self.xi_max
         self.government.tau *= self.tau_max
         self.government.tau_a *= self.tau_max
-        self.Gt_prob *= 0.3
+        self.Gt_prob *= 0.5
 
         # households action
         multi_actions = self.action_wrapper(self.valid_action_dict[self.households.name])
@@ -142,8 +142,8 @@ class economic_society:
         self.households.at_next = total_wealth - self.consumption * (1+self.consumption_tax_rate)
         self.tax_array = income_tax + asset_tax + consumption_tax
         self.Bt_next = (1 + self.interest_rate) * self.Bt + Gt - np.sum(self.tax_array)
-        self.Kt_next = np.sum(self.households.at_next) - self.Bt_next
-        # np.sum(self.households.at_next) - self.Bt_next + (self.alpha * (self.Kt/self.Lt)**(self.alpha-1)+1-self.depreciation_rate ) *self.Kt + (1+self.interest_rate) *(self.Bt - np.sum(self.households.at))
+        #self.Kt_next = np.sum(self.households.at_next) - self.Bt_next
+        self.Kt_next = np.sum(self.households.at_next) - self.Bt_next + (self.alpha * (self.Kt/self.Lt)**(self.alpha-1)+1-self.depreciation_rate ) *self.Kt + (1+self.interest_rate) *(self.Bt - np.sum(self.households.at))
 
         # next state
         next_global_state, next_private_state = self.get_obs()
@@ -244,13 +244,13 @@ class economic_society:
         if 1-self.households.CRRA == 0:
             # if np.min(c_t) < 0:
             #     print(1)
-            u_c = np.log(c_t)
+            u_c = np.log(c_t)  # u_c \in (9,20)
         else:
             u_c = c_t ** (1 - self.households.CRRA) / (1 - self.households.CRRA)
         if 1 + self.households.IFE == 0:
             u_h = np.log(h_t)
         else:
-            u_h = ((h_t/40000)**(1 + self.households.IFE)/(1 + self.households.IFE))
+            u_h = ((5*self.workingHours)**(1 + self.households.IFE)/(1 + self.households.IFE))
         current_utility = u_c - u_h
         return current_utility
 
@@ -265,6 +265,15 @@ class economic_society:
         B = np.trapz(yarray, x=xarray)
         A = 0.5 - B
         return A / (A + B)
+    def stacked_data(self, wealths):
+        sorted_wealth = np.sort(wealths,axis=0)/np.sum(wealths)
+        top_10 = sorted_wealth[int(0.9*self.households.n_households):].sum()
+        top_20 = sorted_wealth[int(0.8*self.households.n_households):int(0.9*self.households.n_households)].sum()
+        top_30 = sorted_wealth[int(0.7*self.households.n_households):int(0.8*self.households.n_households)].sum()
+        top_50 = sorted_wealth[int(0.5*self.households.n_households):int(0.7*self.households.n_households)].sum()
+        top_100 = sorted_wealth[int(0*self.households.n_households):int(0.5*self.households.n_households)].sum()
+        
+        return top_10, top_20, top_30, top_50, top_100
 
 
     def tax_function(self, income, asset):

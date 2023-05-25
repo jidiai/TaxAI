@@ -72,8 +72,8 @@ class maddpg_agent:
         gov_rew = []
         house_rew = []
         epochs = []
-        agent_list = ["households", "government"]
-        update_index = 0
+        wealth_stack = []
+        income_stack = []
 
         for epoch in range(self.args.n_epochs):
             print("epoch:", epoch)
@@ -121,7 +121,7 @@ class maddpg_agent:
             # print the log information
             if epoch % self.args.display_interval == 0:
                 # start to do the evaluation
-                mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years = self._evaluate_agent()
+                mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years, avg_wealth_stacked, avg_income_stacked = self._evaluate_agent()
                 # store rewards and step
                 now_step = (epoch + 1) * self.args.epoch_length
                 gov_rew.append(mean_gov_rewards)
@@ -130,6 +130,8 @@ class maddpg_agent:
                 np.savetxt(str(self.model_path) + "/house_reward.txt", house_rew)
                 epochs.append(now_step)
                 np.savetxt(str(self.model_path) + "/steps.txt", epochs)
+                np.savetxt(str(self.model_path) + "/wealth_stack.txt", wealth_stack)
+                np.savetxt(str(self.model_path) + "/income_stack.txt", income_stack)
                 if self.wandb:
                     wandb.log({"mean households utility": mean_house_rewards,
                                "goverment utility": mean_gov_rewards,
@@ -160,6 +162,17 @@ class maddpg_agent:
     def _get_tensor_inputs(self, obs):
         obs_tensor = torch.tensor(obs, dtype=torch.float32, device='cuda' if self.args.cuda else 'cpu')
         return obs_tensor
+    
+    def test(self):
+        path = "/home/mqr/code/AI-TaxingPolicy/agents/models/maddpg/run30/"
+    
+        for agent_i in range(len(self.agents)):
+            self.agents[agent_i].actor_network.load_state_dict(torch.load(path+ '/agent_' + str(agent_i) + '.pt'))
+            torch.save(self.agents[agent_i].actor_network.state_dict(),
+                       str(self.model_path) + '/agent_' + str(agent_i) + '.pt')
+        mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years, avg_wealth_stacked, avg_income_stacked = self._evaluate_agent()
+        print("mean gov reward:", mean_gov_rewards)
+
 
     def _evaluate_agent(self):
         total_gov_reward = 0
@@ -170,6 +183,8 @@ class maddpg_agent:
         episode_gdp = []
         episode_income_gini = []
         episode_wealth_gini = []
+        wealth_stacked_data = []
+        income_stacked_data = []
         total_steps = 0
 
         for _ in range(self.args.eval_episodes):
@@ -192,15 +207,20 @@ class maddpg_agent:
                 episode_gdp.append(self.eval_env.per_household_gdp)
                 episode_income_gini.append(self.eval_env.income_gini)
                 episode_wealth_gini.append(self.eval_env.wealth_gini)
-
+                # wealth_satcked_data:
+                wealth_stacked_data.append(self.eval_env.stacked_data(self.eval_env.households.at_next))
+                income_stacked_data.append(self.eval_env.stacked_data(self.eval_env.post_income))
+                # self.eval_env.render()
                 if done:
                     break
+
                 global_obs = next_global_obs
                 private_obs = next_private_obs
 
             total_gov_reward += episode_gov_reward
             total_house_reward += episode_mean_house_reward
             total_steps += step_count
+
 
         avg_gov_reward = total_gov_reward / self.args.eval_episodes
         avg_house_reward = total_house_reward / self.args.eval_episodes
@@ -211,7 +231,9 @@ class maddpg_agent:
         avg_gdp = np.mean(episode_gdp)
         avg_income_gini = np.mean(episode_income_gini)
         avg_wealth_gini = np.mean(episode_wealth_gini)
-        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, mean_step
+        avg_wealth_stacked = np.mean(wealth_stacked_data, axis=0)
+        avg_income_stacked = np.mean(income_stacked_data, axis=0)
+        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, mean_step, avg_wealth_stacked, avg_income_stacked
 
     def _evaluate_get_action(self, global_obs, private_obs):
         global_obs_tensor = self._get_tensor_inputs(global_obs)

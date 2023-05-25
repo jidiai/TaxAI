@@ -113,7 +113,7 @@ class Household(BaseEntity):
         #
         # return np.array(y)[:,np.newaxis, ...]
         real_income, _, asset, _ = self.sample_real_data()
-        return real_income/1000,asset/1000
+        return real_income,asset
 
     def get_real_data(self):
         df = pd.read_csv('agents/cfg/scf2013.csv', header=None)

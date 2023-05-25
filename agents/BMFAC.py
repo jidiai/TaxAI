@@ -129,6 +129,8 @@ class BMFAC_agent:
         gov_rew = []
         house_rew = []
         epochs = []
+        wealth_stack = []
+        income_stack = []
         agent_list = ["households", "government"]
         update_index = 0
 
@@ -151,7 +153,7 @@ class BMFAC_agent:
 
                 if epoch < initial_train:
                     self.fix_gov = True
-                    gov_action = np.array([0.1/0.2, 0.0/0.05, 0, 0, 0.1/0.3]) + np.random.normal(0,0.1, size=(5,))
+                    gov_action = np.array([0.1/0.2, 0.0/0.05, 0, 0, 0.1/0.5]) + np.random.normal(0,0.1, size=(5,))
                 else:
                     self.fix_gov = False
 
@@ -173,10 +175,9 @@ class BMFAC_agent:
                 if done:
                     # if done, reset the environment
                     global_obs, private_obs = self.envs.reset()
-                    # past_mean_house_action = self.multiple_households_mean_action()
             # after collect the samples, start to update the network
             for _ in range(self.args.update_cycles):
-                gov_actor_loss, gov_critic_loss, house_actor_loss, house_critic_loss = self._update_network(update_agent)
+                gov_actor_loss, gov_critic_loss, house_actor_loss, house_critic_loss = self._update_network(update_agent="all")
                 # update the target network
                 if global_timesteps % self.args.target_update_interval == 0:
                     self._update_target_network(self.target_gov_qf, self.gov_critic)
@@ -185,7 +186,7 @@ class BMFAC_agent:
             # print the log information
             if epoch % self.args.display_interval == 0:
                 # start to do the evaluation
-                mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years = self._evaluate_agent()
+                mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years, avg_wealth_stacked, avg_income_stacked = self._evaluate_agent()
                 # store rewards and step
                 now_step = (epoch + 1) * self.args.epoch_length
                 gov_rew.append(mean_gov_rewards)
@@ -194,6 +195,8 @@ class BMFAC_agent:
                 np.savetxt(str(self.model_path) + "/house_reward.txt", house_rew)
                 epochs.append(now_step)
                 np.savetxt(str(self.model_path) + "/steps.txt", epochs)
+                np.savetxt(str(self.model_path) + "/wealth_stack.txt", wealth_stack)
+                np.savetxt(str(self.model_path) + "/income_stack.txt", income_stack)
 
                 wandb.log({"mean households utility": mean_house_rewards,
                            "goverment utility": mean_gov_rewards,
@@ -220,10 +223,11 @@ class BMFAC_agent:
         wandb.finish()
 
     def test(self):
-        self.gov_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/wealth_distribution/baseline/run56/gov_actor.pt"))
-        self.house_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/wealth_distribution/baseline/run56/house_actor.pt"))
-        rew = self._evaluate_agent()
-        return rew
+        self.gov_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/bmfac/run105/gov_actor.pt"))
+        self.house_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/bmfac/run105/house_actor.pt"))
+        mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years, avg_wealth_stacked, avg_income_stacked = self._evaluate_agent()
+        print("mean gov reward:", mean_gov_rewards)
+
 
     # do the initial exploration by using the uniform policy
     def _initial_exploration(self, exploration_policy='gaussian'):
@@ -248,7 +252,7 @@ class BMFAC_agent:
                     temp = np.zeros((self.args.n_households, 2))
                     temp[:, 0] = 0.9
                     temp[:, 1] = 1 / 3
-                    temp += np.random.normal(0,0.1, size=(100,2))
+                    temp += np.random.normal(0,0.1, size=(self.args.n_households,2))
 
                     hou_action = temp * 2 - 1
                     gov_action = gov_action * 2 - 1
@@ -373,6 +377,8 @@ class BMFAC_agent:
         episode_gdp = []
         episode_income_gini = []
         episode_wealth_gini = []
+        wealth_stacked_data = []
+        income_stacked_data = []
         total_steps = 0
 
         for _ in range(self.args.eval_episodes):
@@ -395,15 +401,20 @@ class BMFAC_agent:
                 episode_gdp.append(self.eval_env.per_household_gdp)
                 episode_income_gini.append(self.eval_env.income_gini)
                 episode_wealth_gini.append(self.eval_env.wealth_gini)
-
+                # wealth_satcked_data:
+                wealth_stacked_data.append(self.eval_env.stacked_data(self.eval_env.households.at_next))
+                income_stacked_data.append(self.eval_env.stacked_data(self.eval_env.post_income))
+                # self.eval_env.render()
                 if done:
                     break
+
                 global_obs = next_global_obs
                 private_obs = next_private_obs
 
             total_gov_reward += episode_gov_reward
             total_house_reward += episode_mean_house_reward
             total_steps += step_count
+
 
         avg_gov_reward = total_gov_reward / self.args.eval_episodes
         avg_house_reward = total_house_reward / self.args.eval_episodes
@@ -414,7 +425,9 @@ class BMFAC_agent:
         avg_gdp = np.mean(episode_gdp)
         avg_income_gini = np.mean(episode_income_gini)
         avg_wealth_gini = np.mean(episode_wealth_gini)
-        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, mean_step
+        avg_wealth_stacked = np.mean(wealth_stacked_data, axis=0)
+        avg_income_stacked = np.mean(income_stacked_data, axis=0)
+        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, mean_step, avg_wealth_stacked, avg_income_stacked
 
     def _evaluate_get_action(self, global_obs, private_obs):
         global_obs_tensor = self._get_tensor_inputs(global_obs)
@@ -429,7 +442,7 @@ class BMFAC_agent:
         gov_action = gov_action.detach().cpu().numpy()[0]
         hou_action = hou_action.detach().cpu().numpy()[0]
         if self.fix_gov == True:
-            gov_action = np.array([0.1 / 0.2, 0.0 / 0.05, 0, 0, 0.1 / 0.3]) + np.random.normal(0, 0.1, size=(5,))
+            gov_action = np.array([0.1 / 0.2, 0.0 / 0.05, 0, 0, 0.1 / 0.5]) + np.random.normal(0, 0.1, size=(5,))
 
         action = {self.eval_env.government.name: self.gov_action_max * gov_action,
                   self.eval_env.households.name: self.hou_action_max * hou_action}

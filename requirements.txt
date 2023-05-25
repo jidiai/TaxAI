@@ -9,3 +9,5 @@ quantecon==0.5.2
 scipy
 tensorboardX
 torch
+wandb
+pygame

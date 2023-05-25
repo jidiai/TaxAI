@@ -56,13 +56,15 @@ class rule_agent:
         gov_rew = []
         house_rew = []
         epochs = []
+        wealth_stack = []
+        income_stack = []
         for epoch in range(1000):
 
 
             if epoch % self.args.display_interval == 0:
 
                 # start to do the evaluation
-                mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years = self._evaluate_agent()
+                mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years, avg_wealth_stacked, avg_income_stacked = self._evaluate_agent()
                 # store rewards and step
                 now_step = (epoch + 1) * self.args.epoch_length
                 gov_rew.append(mean_gov_rewards)
@@ -71,6 +73,11 @@ class rule_agent:
                 np.savetxt(str(self.model_path) + "/house_reward.txt", house_rew)
                 epochs.append(now_step)
                 np.savetxt(str(self.model_path) + "/steps.txt", epochs)
+                wealth_stack.append(avg_wealth_stacked)
+                income_stack.append(avg_income_stacked)
+                np.savetxt(str(self.model_path) + "/wealth_stack.txt", wealth_stack)
+                np.savetxt(str(self.model_path) + "/income_stack.txt", income_stack)
+                
 
                 # GDP + mean utility + wealth distribution + income distribution
                 wandb.log({"mean households utility": mean_house_rewards,
@@ -98,6 +105,8 @@ class rule_agent:
         episode_gdp = []
         episode_income_gini = []
         episode_wealth_gini = []
+        wealth_stacked_data = []
+        income_stacked_data = []
         total_steps = 0
 
         for _ in range(self.args.eval_episodes):
@@ -120,12 +129,10 @@ class rule_agent:
                 episode_gdp.append(self.eval_env.per_household_gdp)
                 episode_income_gini.append(self.eval_env.income_gini)
                 episode_wealth_gini.append(self.eval_env.wealth_gini)
+                # wealth_satcked_data:
+                wealth_stacked_data.append(self.eval_env.stacked_data(self.eval_env.households.at_next))
+                income_stacked_data.append(self.eval_env.stacked_data(self.eval_env.post_income))
                 # self.eval_env.render()
-                # if done and self.eval_env.step_cnt < self.eval_env.episode_length:
-
-                # '''save variables'''
-                # if self.eval_env.step_cnt == 1 or self.eval_env.step_cnt == 30 or self.eval_env.step_cnt == 100:
-                #     save_parameters(self.model_path, self.eval_env.step_cnt, 1, self.eval_env)
                 if done:
                     break
 
@@ -146,12 +153,15 @@ class rule_agent:
         avg_gdp = np.mean(episode_gdp)
         avg_income_gini = np.mean(episode_income_gini)
         avg_wealth_gini = np.mean(episode_wealth_gini)
-        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, mean_step
+        avg_wealth_stacked = np.mean(wealth_stacked_data, axis=0)
+        avg_income_stacked = np.mean(income_stacked_data, axis=0)
+        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, mean_step, avg_wealth_stacked, avg_income_stacked
 
     def _evaluate_get_action(self, global_obs, private_obs):
         # gov_action = np.array([0.263, 0.049, 0.2, 0.05, 0.189, 0.8])
         # gov_action = np.array([0.05/0.5, 0.0/0.1, 0, 0, 0.1])
-        gov_action = np.array([0., 0., 0, 0, 0.1/0.3])
+        gov_action = np.array([0., 0., 0, 0, 0.1/0.5])
+        # gov_action = np.array([0.263., 0.049., 0, 0, 0.1/0.3])
         temp = np.zeros((self.args.n_households, 2))
         temp[:, 0] = 0.9
         temp[:, 1] = 1 / 3
