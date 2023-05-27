@@ -22,8 +22,10 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default='default')
     parser.add_argument("--alg", type=str, default='ac', help="ac, rule_based, independent")
+    parser.add_argument("--task", type=str, default='gdp', help="gini, social_welfare, gdp_gini")
     parser.add_argument('--device-num', type=int, default=1, help='the number of cuda service num')
     parser.add_argument('--n_households', type=int, default=100, help='the number of total households')
+    parser.add_argument('--seed', type=int, default=1, help='the random seed')
     # parser.add_argument('--update_freq', type=int, default=1, help='the number of total households')
     # parser.add_argument('--initial_train', type=int, default=2000, help='the number of total households')
 
@@ -42,7 +44,9 @@ if __name__ == '__main__':
     # yaml_cfg = OmegaConf.load(f'D:\\code\\AI-TaxingPolicy\\AI-TaxingPolicy\\cfg\\default.yaml')
     yaml_cfg.Trainer["n_households"] = args.n_households
     yaml_cfg.Environment.Entities[1]["entity_args"].n = args.n_households
-
+    yaml_cfg.Environment.env_core["env_args"].gov_task = args.task
+    yaml_cfg.seed = args.seed
+    
     set_seeds(yaml_cfg.seed, cuda=yaml_cfg.Trainer["cuda"])
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.device_num)
     env = economic_society(yaml_cfg.Environment)

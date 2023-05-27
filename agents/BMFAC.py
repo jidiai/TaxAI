@@ -177,7 +177,7 @@ class BMFAC_agent:
                     global_obs, private_obs = self.envs.reset()
             # after collect the samples, start to update the network
             for _ in range(self.args.update_cycles):
-                gov_actor_loss, gov_critic_loss, house_actor_loss, house_critic_loss = self._update_network(update_agent="all")
+                gov_actor_loss, gov_critic_loss, house_actor_loss, house_critic_loss = self._update_network(update_agent=update_agent)
                 # update the target network
                 if global_timesteps % self.args.target_update_interval == 0:
                     self._update_target_network(self.target_gov_qf, self.gov_critic)
@@ -414,8 +414,6 @@ class BMFAC_agent:
             total_gov_reward += episode_gov_reward
             total_house_reward += episode_mean_house_reward
             total_steps += step_count
-
-
         avg_gov_reward = total_gov_reward / self.args.eval_episodes
         avg_house_reward = total_house_reward / self.args.eval_episodes
         mean_step = total_steps / self.args.eval_episodes

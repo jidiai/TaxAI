@@ -130,6 +130,8 @@ class maddpg_agent:
                 np.savetxt(str(self.model_path) + "/house_reward.txt", house_rew)
                 epochs.append(now_step)
                 np.savetxt(str(self.model_path) + "/steps.txt", epochs)
+                wealth_stack.append(avg_wealth_stacked)
+                income_stack.append(avg_income_stacked)
                 np.savetxt(str(self.model_path) + "/wealth_stack.txt", wealth_stack)
                 np.savetxt(str(self.model_path) + "/income_stack.txt", income_stack)
                 if self.wandb:

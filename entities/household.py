@@ -103,15 +103,6 @@ class Household(BaseEntity):
         plt.show()
 
     def initial_wealth_distribution(self):  # 大部分国家财富分布遵循 pareto distribution
-        # x = np.linspace(0.01, 1, self.n_households)
-        #
-        # def pareto(x):
-        #     a = 0.68  # pareto tail index, a 越大, 贫富差距越小 a=0.68, Gini=0.85
-        #     return np.power(x, -1 / a)
-        #
-        # y = pareto(x)
-        #
-        # return np.array(y)[:,np.newaxis, ...]
         real_income, _, asset, _ = self.sample_real_data()
         return real_income,asset
 
@@ -137,12 +128,7 @@ class Household(BaseEntity):
         return batch_wage_income.reshape(self.n_households, 1), batch_income.reshape(self.n_households, 1), batch_asset.reshape(self.n_households, 1), batch_consumption.reshape(self.n_households, 1)
 
 
-    def render(self):
-        # todo visualization
-        pass
-
     def close(self):
-        # 是否需要？
         pass
 
 
