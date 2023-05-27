@@ -270,10 +270,15 @@ class economic_society:
         top_10 = sorted_wealth[int(0.9*self.households.n_households):].sum()
         top_20 = sorted_wealth[int(0.8*self.households.n_households):int(0.9*self.households.n_households)].sum()
         top_30 = sorted_wealth[int(0.7*self.households.n_households):int(0.8*self.households.n_households)].sum()
-        top_50 = sorted_wealth[int(0.5*self.households.n_households):int(0.7*self.households.n_households)].sum()
-        top_100 = sorted_wealth[int(0*self.households.n_households):int(0.5*self.households.n_households)].sum()
+        top_40 = sorted_wealth[int(0.6*self.households.n_households):int(0.7*self.households.n_households)].sum()
+        top_50 = sorted_wealth[int(0.5*self.households.n_households):int(0.6*self.households.n_households)].sum()
+        top_60 = sorted_wealth[int(0.4*self.households.n_households):int(0.5*self.households.n_households)].sum()
+        top_70 = sorted_wealth[int(0.3*self.households.n_households):int(0.4*self.households.n_households)].sum()
+        top_80 = sorted_wealth[int(0.2*self.households.n_households):int(0.3*self.households.n_households)].sum()
+        top_90 = sorted_wealth[int(0.1*self.households.n_households):int(0.2*self.households.n_households)].sum()
+        top_100 = sorted_wealth[int(0*self.households.n_households):int(0.1*self.households.n_households)].sum()
         
-        return top_10, top_20, top_30, top_50, top_100
+        return [top_10, top_20, top_30, top_40, top_50, top_60, top_70, top_80, top_90, top_100]
 
 
     def tax_function(self, income, asset):
