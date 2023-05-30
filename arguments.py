@@ -28,13 +28,6 @@ def get_args():
     parse.add_argument('--eval-episodes', type=int, default=10, help='the episodes that used for evaluation')
     parse.add_argument('--tau', type=float, default=5e-3, help='the soft update coefficient')
     parse.add_argument('--display-interval', type=int, default=1, help='the display interval')
-    # parse.add_argument('--save-dir', type=str, default='saved_models/', help='the place to save models')
-    # parse.add_argument('--reg', type=float, default=1e-3, help='the reg term')
-
-
-    # parse.add_argument('--episode-length', type=int, default=150, help='the length of one episode')
-    # parse.add_argument('--random-init', action='store_true', help='if use random init in the episode')
-    # parse.add_argument('--render', action='store_true', help='if render the env')
     parse.add_argument('--consumption_range', type=float, default=1.0, help='the max term of consumption')
     parse.add_argument('--working_hours_range', type=float, default=24.0, help='the max term of working hours')
     parse.add_argument('--saving_prob', type=float, default=1.0, help='Proportion of savings')  # 有budget constraint, saving与consumption只用一个即可

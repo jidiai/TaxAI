@@ -37,9 +37,6 @@ class economic_society:
 
         self.depreciation_rate = env_args['depreciation_rate']
         self.interest_rate = env_args['interest_rate']
-        self.hours_max = env_args['hours_max']
-        self.episode_years = env_args['episode_years']
-        self.year_per_step = env_args['year_per_step']
         self.consumption_tax_rate = env_args['consumption_tax_rate']
         self.gini_weight = env_args['gini_weight']
         self.gov_task = env_args['gov_task']
@@ -88,7 +85,7 @@ class economic_society:
         input: (-1,1)之间
         output: (0, 0.9999)
         '''
-        return np.clip((actions+1)/2, 0, 0.999)
+        return np.clip((actions+1)/2, 0.001, 0.99)
 
     def workinghours_wrapper(self, ht):
         return self.hours_max * ht
@@ -108,10 +105,11 @@ class economic_society:
         self.government.xi_a *= self.xi_max
         self.government.tau *= self.tau_max
         self.government.tau_a *= self.tau_max
-        self.Gt_prob *= 0.5
+        self.Gt_prob *= 0.3
 
         # households action
         multi_actions = self.action_wrapper(self.valid_action_dict[self.households.name])
+        # saving_p = np.array(multi_actions[:, 0])[:,np.newaxis,...] * 0.3 + 0.7
         saving_p = np.array(multi_actions[:, 0])[:,np.newaxis,...] * 0.5 + 0.5
         self.workingHours = np.array(multi_actions[:, 1])[:,np.newaxis,...]
         self.ht = self.workinghours_wrapper(self.workingHours)
@@ -132,6 +130,8 @@ class economic_society:
 
         # compute tax
         aggregate_consumption = (1 - saving_p) * total_wealth
+        if aggregate_consumption.min() <= 0:
+            print(1)
         choose_consumption = 1/(1 + self.consumption_tax_rate) * aggregate_consumption
 
         if np.sum(choose_consumption) + Gt > self.GDP:
@@ -155,7 +155,8 @@ class economic_society:
         self.households_reward = self.utility_function(self.consumption, self.ht)
         self.government_reward = self.gov_reward()
         # 如果gini>0.8, 有人破产， GDP过低 都会结束
-        self.done = self.done or bool(self.wealth_gini > 0.9 or self.income_gini>0.9 or math.isnan(self.government_reward) or math.isnan(np.mean(self.households_reward)) or np.min(self.households.at_next) < 0 or self.Bt_next <0 or self.Kt_next < 0)
+        self.done = self.done or bool(self.wealth_gini > 0.9 or self.income_gini>0.9 or math.isnan(self.government_reward) or
+                                      math.isnan(np.mean(self.households_reward)) or np.min(self.households.at_next) < 0 or self.Bt_next <0 or self.Kt_next < 0)
 
         if math.isnan(self.government_reward) or math.isnan(np.mean(self.households_reward)):
             self.done = True
@@ -173,6 +174,7 @@ class economic_society:
     def gov_reward(self):
         '''人均GDP增长率 - weight * gini'''
         gov_goal = self.gov_task
+        # gov_goal = "gini"
         if gov_goal == "gdp":
             return (self.per_household_gdp - self.old_per_gdp) / self.old_per_gdp
         elif gov_goal == "gini":
@@ -195,6 +197,20 @@ class economic_society:
             return False
 
     def reset(self, **custom_cfg):
+        # self.step_cnt = 0
+        # self.government.reset()
+        # self.households.reset()
+        # self.Kt_next = np.sum(self.households.at_next) * 0.5
+        # self.Bt_next = np.sum(self.households.at_next) * 0.5
+        # self.done = False
+        #
+        # self.Kt = copy.copy(self.Kt_next)
+        # self.workingHours = np.ones((self.households.n_households,1))/3
+        # self.ht = self.workinghours_wrapper(self.workingHours)
+        # self.MarketClear()
+        # self.GDP = self.generate_gdp()
+        # self.income = self.households.e * self.ht
+        '''new try'''
         self.step_cnt = 0
         self.government.reset()
         self.households.reset()
@@ -203,11 +219,14 @@ class economic_society:
         self.done = False
 
         self.Kt = copy.copy(self.Kt_next)
+        self.Lt = np.sum(self.households.at) * (1-6.6*0.04)/6.6
+        self.WageRate = (1 - self.alpha) * np.power(self.Kt / self.Lt, self.alpha)
         self.workingHours = np.ones((self.households.n_households,1))/3
+        self.hours_max = self.Lt/np.sum(self.households.e * self.WageRate*self.workingHours)
         self.ht = self.workinghours_wrapper(self.workingHours)
-        self.MarketClear()
         self.GDP = self.generate_gdp()
         self.income = self.households.e * self.ht
+        # print("reset:  hour_max:", self.hours_max)
 
         # self.display_mode = False
         self.display_mode = False
@@ -242,8 +261,6 @@ class economic_society:
     def utility_function(self, c_t, h_t):
         # life-time CRRA utility
         if 1-self.households.CRRA == 0:
-            # if np.min(c_t) < 0:
-            #     print(1)
             u_c = np.log(c_t)  # u_c \in (9,20)
         else:
             u_c = c_t ** (1 - self.households.CRRA) / (1 - self.households.CRRA)

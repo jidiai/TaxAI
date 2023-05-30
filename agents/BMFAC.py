@@ -73,14 +73,14 @@ class BMFAC_agent:
         self.gov_action_max = self.envs.government.action_space.high[0]
         self.hou_action_max = self.envs.households.action_space.high[0][0]
 
-        self.model_path, _ = make_logpath(algo="bmfac")
+        self.model_path, _ = make_logpath(algo="bmfac",n=self.args.n_households)
         save_args(path=self.model_path, args=self.args)
         self.fix_gov = True
         wandb.init(
             config=self.args,
             project="AI_TaxingPolicy",
             entity="ai_tax",
-            name=self.model_path.parent.name + "-"+ self.model_path.name +'  n='+ str(self.args.n_households),
+            name=self.model_path.parent.parent.name+ "-"+ self.model_path.name +'  n='+ str(self.args.n_households),
             dir=str(self.model_path),
             job_type="training",
             reinit=True
@@ -153,7 +153,7 @@ class BMFAC_agent:
 
                 if epoch < initial_train:
                     self.fix_gov = True
-                    gov_action = np.array([0.1/0.2, 0.0/0.05, 0, 0, 0.1/0.5]) + np.random.normal(0,0.1, size=(5,))
+                    gov_action = np.array([0.1/0.5, 0.0/0.05, 0, 0, 0.1]) + np.random.normal(0,0.1, size=(5,))
                 else:
                     self.fix_gov = False
 
@@ -239,16 +239,7 @@ class BMFAC_agent:
                 raise NotImplementedError
             elif exploration_policy == 'gaussian':
                 with torch.no_grad():
-                    # global_obs_tensor = self._get_tensor_inputs(global_obs)
-                    # private_obs_tensor = self._get_tensor_inputs(private_obs)
-                    # gov_pi = self.gov_actor(global_obs_tensor)
-                    # gov_action = get_action_info(gov_pi, cuda=self.args.cuda).select_actions(reparameterize=False)
-                    # # hou_pi = self.house_actor(global_obs_tensor, private_obs_tensor, gov_action, self._get_tensor_inputs(past_mean_house_action))
-                    # hou_pi = self.house_actor(global_obs_tensor, private_obs_tensor, gov_action)
-                    # hou_action = get_action_info(hou_pi, cuda=self.args.cuda).select_actions(reparameterize=False)
-                    # gov_action = gov_action.cpu().numpy()[0]
-                    # hou_action = hou_action.cpu().numpy()[0]
-                    gov_action = np.array([0.1/0.2, 0.0/0.05, 0, 0, 0.1/0.3]) + np.random.normal(0,0.1, size=(5,))
+                    gov_action = np.array([0.1/0.5, 0.0/0.05, 0, 0, 0.1]) + np.random.normal(0,0.1, size=(5,))
                     temp = np.zeros((self.args.n_households, 2))
                     temp[:, 0] = 0.9
                     temp[:, 1] = 1 / 3

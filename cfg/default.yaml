@@ -13,8 +13,6 @@ Environment:
     - entity_name: 'household'
       entity_args:
         n: 10
-        consumption_range: 1
-        working_hours_range: 24
         CRRA: 1
         IFE: 2
         eta: 0
@@ -34,7 +32,7 @@ Environment:
       depreciation_rate: 0.06
       consumption_tax_rate: 0.065
       interest_rate: 0.04
-      hours_max: 851160               # 7093 * 40 * 30  ensure wealth/income=6.6
+#      hours_max: 851160               # 7093 * 40 * 30  ensure wealth/income=6.6
       gini_weight: 1
       gov_task: "gdp"  # choices: {"gdp", "gini", "social_welfare", "gdp_gini"}
 
@@ -45,17 +43,17 @@ Trainer:
   log_std_max:  2
   hidden_size:  256
   cuda: True
-  q_lr: 3e-4
-  p_lr: 3e-4
+  q_lr: 3e-3
+  p_lr: 3e-3
   buffer_size:  1e6
   env_name: 'wealth_distribution'
   init_exploration_policy:  'gaussian'
-  n_epochs: 1000
+  n_epochs: 2000
   epoch_length: 500
   update_cycles:  10
   target_update_interval: 1
   display_interval: 1
-  batch_size: 64
+  batch_size: 128
   gamma: 0.975
   tau:  5e-3
   eval_episodes: 10

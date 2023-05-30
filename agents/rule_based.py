@@ -37,13 +37,13 @@ class rule_agent:
         self.gov_action_max = self.envs.government.action_space.high[0]
         self.hou_action_max = self.envs.households.action_space.high[0]
 
-        self.model_path, _ = make_logpath(algo="rule_based")
+        self.model_path, _ = make_logpath(algo="rule_based",n=self.args.n_households)
         save_args(path=self.model_path, args=self.args)
         wandb.init(
             config=self.args,
             project="AI_TaxingPolicy",
             entity="ai_tax",
-            name=self.model_path.parent.name + "-" +self.model_path.name +'  n='+ str(self.args.n_households),
+            name=self.model_path.parent.parent.name + "-" +self.model_path.name +'  n='+ str(self.args.n_households),
             dir=str(self.model_path),
             job_type="training",
             reinit=True
@@ -142,7 +142,9 @@ class rule_agent:
             total_gov_reward += episode_gov_reward
             total_house_reward += episode_mean_house_reward
             total_steps += step_count
-
+            # '''save variables'''
+            # epoch =1
+            # save_parameters(self.model_path, self.envs.step_cnt, epoch, self.eval_env)
 
         avg_gov_reward = total_gov_reward / self.args.eval_episodes
         avg_house_reward = total_house_reward / self.args.eval_episodes

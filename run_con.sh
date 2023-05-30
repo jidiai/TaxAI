@@ -1,11 +1,11 @@
 #!/bin/sh$
 
-dist="ppo"
-n=10
-device=0
+dist="maddpg"
+n=100
+device=1
 obj_task="gdp"
 
-for seed in {0,2,3};
+for seed in {1,2,3};
 do
   let real_seed=$seed
   echo "real_seed is ${real_seed}"

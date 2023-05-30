@@ -45,7 +45,7 @@ class maddpg_agent:
         # define the replay buffer
         self.buffer = replay_buffer(self.args.buffer_size)
 
-        self.model_path, _ = make_logpath(algo="maddpg")
+        self.model_path, _ = make_logpath(algo="maddpg",n=self.args.n_households)
         save_args(path=self.model_path, args=self.args)
         self.fix_gov = True
         self.wandb = True
@@ -54,7 +54,7 @@ class maddpg_agent:
                 config=self.args,
                 project="AI_TaxingPolicy",
                 entity="ai_tax",
-                name=self.model_path.parent.name + "-"+ self.model_path.name +'  n='+ str(self.args.n_households),
+                name=self.model_path.parent.parent.name + "-"+ self.model_path.name +'  n='+ str(self.args.n_households),
                 dir=str(self.model_path),
                 job_type="training",
                 reinit=True
@@ -76,6 +76,8 @@ class maddpg_agent:
         income_stack = []
 
         for epoch in range(self.args.n_epochs):
+            if epoch == 1:
+                print(1)
             print("epoch:", epoch)
             # for each epoch, it will reset the environment
             for t in range(self.args.epoch_length):
@@ -235,7 +237,8 @@ class maddpg_agent:
         avg_wealth_gini = np.mean(episode_wealth_gini)
         avg_wealth_stacked = np.mean(wealth_stacked_data, axis=0)
         avg_income_stacked = np.mean(income_stacked_data, axis=0)
-        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, mean_step, avg_wealth_stacked, avg_income_stacked
+        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, \
+               avg_wealth_gini, mean_step, avg_wealth_stacked, avg_income_stacked
 
     def _evaluate_get_action(self, global_obs, private_obs):
         global_obs_tensor = self._get_tensor_inputs(global_obs)

@@ -17,10 +17,6 @@ class Household(BaseEntity):
     def __init__(self, entity_args):
         super().__init__()
         self.n_households = entity_args['n']
-        # max action
-        self.consumption_range = entity_args['consumption_range']          #action range
-        self.working_hours_range = entity_args['working_hours_range']
-
         # fixed hyperparameter
         self.CRRA = entity_args['CRRA']                                    #theta
         self.IFE = entity_args['IFE']                                      #inverse Frisch Elasticity
@@ -33,8 +29,8 @@ class Household(BaseEntity):
 
         self.action_dim = entity_args['action_shape']
 
-        self.real_income, self.wage_income, self.real_asset, self.real_consumption = self.get_real_data()
-
+        self.real_asset = self.get_real_data()
+        self.households_init()
         self.reset()
         self.action_space = Box(
             low=-1, high=1, shape=(self.n_households, self.action_dim), dtype=np.float32
@@ -48,7 +44,9 @@ class Household(BaseEntity):
         self.e_array[:, 0] = (random_set > self.e_p).astype(int)
         self.e_array[:, 1] = (random_set < self.e_p).astype(int)
         self.e = np.sum(self.e_array, axis=1, keepdims=True)
-
+        
+        self.e_0 = copy.copy(self.e)
+        self.e_array_0 = copy.copy(self.e_array)
 
     def generate_e_ability(self):
         """
@@ -82,13 +80,20 @@ class Household(BaseEntity):
 
 
     def reset(self, **custom_cfg):
-        # self.e = self.e_distribution()
-
-        self.e_initial(self.n_households)
+        # self.e_initial(self.n_households)
+        # self.generate_e_ability()
+        # self.real_income, self.at = self.initial_wealth_distribution()
+        # self.at_next = copy.copy(self.at)
+        self.e = copy.copy(self.e_0)
+        self.e_array = copy.copy(self.e_array_0)
         self.generate_e_ability()
-        self.real_income, self.at = self.initial_wealth_distribution()
+        self.at = copy.copy(self.at_init)
         self.at_next = copy.copy(self.at)
+        
 
+    def households_init(self):
+        self.e_initial(self.n_households)
+        self.at_init = self.initial_wealth_distribution()
 
     def lorenz_curve(self, wealths):
         '''
@@ -103,31 +108,38 @@ class Household(BaseEntity):
         plt.show()
 
     def initial_wealth_distribution(self):  # 大部分国家财富分布遵循 pareto distribution
-        real_income, _, asset, _ = self.sample_real_data()
-        return real_income,asset
+        asset = self.sample_real_data()
+        return asset
 
     def get_real_data(self):
         df = pd.read_csv('agents/cfg/scf2013.csv', header=None)
 
-        income = df[0].values[1:].astype(np.float32)
+        # income = df[0].values[1:].astype(np.float32)
         # saving = df[1].values[1:].astype(np.float32)
-        wage_income = df[2].values[1:].astype(np.float32)
+        # wage_income = df[2].values[1:].astype(np.float32)
         asset = df[3].values[1:].astype(np.float32)
-        c_1 = df[4].values[1:].astype(np.float32)
-        c_2 = df[5].values[1:].astype(np.float32)
-        c_3 = df[6].values[1:].astype(np.float32)
-        c_4 = df[7].values[1:].astype(np.float32)
-        return income, wage_income, asset, (c_1 + c_2 + c_3 + c_4)
+        # c_1 = df[4].values[1:].astype(np.float32)
+        # c_2 = df[5].values[1:].astype(np.float32)
+        # c_3 = df[6].values[1:].astype(np.float32)
+        # c_4 = df[7].values[1:].astype(np.float32)
+        # return income, wage_income, asset, (c_1 + c_2 + c_3 + c_4)
+        temp = np.unique(asset)[np.unique(asset)>0]
+        return temp
 
+    # def sample_real_data(self):
+    #     index = [random.randint(0, len(self.real_income) - 1) for _ in range(self.n_households)]
+    #     batch_wage_income = self.wage_income[index]
+    #     batch_income = self.real_income[index]
+    #     batch_asset = self.real_asset[index]
+    #     batch_consumption = self.real_consumption[index]
+    #     return batch_wage_income.reshape(self.n_households, 1), batch_income.reshape(self.n_households, 1), batch_asset.reshape(self.n_households, 1), batch_consumption.reshape(self.n_households, 1)
+    
     def sample_real_data(self):
-        index = [random.randint(0, len(self.real_income) - 1) for _ in range(self.n_households)]
-        batch_wage_income = self.wage_income[index]
-        batch_income = self.real_income[index]
+        # index = [random.randint(0, len(self.real_asset) - 1) for _ in range(self.n_households)]
+        index = np.random.choice(range(0, len(self.real_asset) - 1), self.n_households, replace=False)
         batch_asset = self.real_asset[index]
-        batch_consumption = self.real_consumption[index]
-        return batch_wage_income.reshape(self.n_households, 1), batch_income.reshape(self.n_households, 1), batch_asset.reshape(self.n_households, 1), batch_consumption.reshape(self.n_households, 1)
-
-
+        return batch_asset.reshape(self.n_households, 1)
+    
     def close(self):
         pass
 
