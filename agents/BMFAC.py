@@ -76,15 +76,17 @@ class BMFAC_agent:
         self.model_path, _ = make_logpath(algo="bmfac",n=self.args.n_households)
         save_args(path=self.model_path, args=self.args)
         self.fix_gov = True
-        wandb.init(
-            config=self.args,
-            project="AI_TaxingPolicy",
-            entity="ai_tax",
-            name=self.model_path.parent.parent.name+ "-"+ self.model_path.name +'  n='+ str(self.args.n_households),
-            dir=str(self.model_path),
-            job_type="training",
-            reinit=True
-        )
+        self.wandb = True
+        if self.wandb:
+            wandb.init(
+                config=self.args,
+                project="AI_TaxingPolicy",
+                entity="ai_tax",
+                name=self.model_path.parent.parent.name+ "-"+ self.model_path.name +'  n='+ str(self.args.n_households),
+                dir=str(self.model_path),
+                job_type="training",
+                reinit=True
+            )
 
     def house_action_initialize(self):
         action = np.random.uniform(low=-self.hou_action_max, high=self.hou_action_max, size=(1, self.args.n_households, self.envs.households.action_space.shape[1]))
@@ -153,7 +155,11 @@ class BMFAC_agent:
 
                 if epoch < initial_train:
                     self.fix_gov = True
-                    gov_action = np.array([0.1/0.5, 0.0/0.05, 0, 0, 0.1]) + np.random.normal(0,0.1, size=(5,))
+                    # gov_action = np.array([0.1/0.5, 0.0/0.05, 0, 0, 0.1]) + np.random.normal(0,0.1, size=(5,))
+                    temp = np.zeros((self.args.n_households, 2))
+                    temp[:, 0] = 0.7
+                    temp[:, 1] = 1 / 3
+                    hou_action = temp * 2 - 1
                 else:
                     self.fix_gov = False
 
@@ -169,9 +175,9 @@ class BMFAC_agent:
                 global_obs = next_global_obs
                 private_obs = next_private_obs
                 '''save variables'''
-                # if epoch == 1 or epoch == 100 or epoch == 1000:
-                #     if self.envs.step_cnt == 1 or self.envs.step_cnt == 100 or self.envs.step_cnt == 299:
-                #         save_parameters(self.model_path, self.envs.step_cnt, epoch, self.envs)
+                if epoch == 1:
+                    if self.envs.step_cnt == 1 or self.envs.step_cnt == 10 or self.envs.step_cnt == 30:
+                        save_parameters(self.model_path, self.envs.step_cnt, epoch, self.envs)
                 if done:
                     # if done, reset the environment
                     global_obs, private_obs = self.envs.reset()
@@ -198,20 +204,21 @@ class BMFAC_agent:
                 np.savetxt(str(self.model_path) + "/wealth_stack.txt", wealth_stack)
                 np.savetxt(str(self.model_path) + "/income_stack.txt", income_stack)
 
-                wandb.log({"mean households utility": mean_house_rewards,
-                           "goverment utility": mean_gov_rewards,
-                           "years": years,
-                           "wealth gini": avg_wealth_gini,
-                           "income gini": avg_income_gini,
-                           "GDP": avg_gdp,
-                           "tax per households": avg_mean_tax,
-                           "post income per households": avg_mean_post_income,
-                           "wealth per households": avg_mean_wealth,
-                           "government actor loss": gov_actor_loss,
-                           "government critic loss": gov_critic_loss,
-                           "households actor loss": house_actor_loss,
-                           "households critic loss": house_critic_loss,
-                           "steps": now_step})
+                if self.wandb:
+                    wandb.log({"mean households utility": mean_house_rewards,
+                               "goverment utility": mean_gov_rewards,
+                               "years": years,
+                               "wealth gini": avg_wealth_gini,
+                               "income gini": avg_income_gini,
+                               "GDP": avg_gdp,
+                               "tax per households": avg_mean_tax,
+                               "post income per households": avg_mean_post_income,
+                               "wealth per households": avg_mean_wealth,
+                               "government actor loss": gov_actor_loss,
+                               "government critic loss": gov_critic_loss,
+                               "households actor loss": house_actor_loss,
+                               "households critic loss": house_critic_loss,
+                               "steps": now_step})
 
                 print(
                     '[{}] Epoch: {} / {}, Frames: {}, gov_Rewards: {:.3f}, house_Rewards: {:.3f}, years:{:.3f}, gov_actor_loss: {:.3f}, gov_critic_loss: {:.3f}, house_actor_loss: {:.3f}, house_critic_loss: {:.3f}'.format(
@@ -219,8 +226,8 @@ class BMFAC_agent:
                 # save models
                 torch.save(self.gov_actor.state_dict(), str(self.model_path) + '/gov_actor.pt')
                 torch.save(self.house_actor.state_dict(), str(self.model_path) + '/house_actor.pt')
-
-        wandb.finish()
+        if self.wandb:
+            wandb.finish()
 
     def test(self):
         self.gov_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/bmfac/run105/gov_actor.pt"))
@@ -241,7 +248,7 @@ class BMFAC_agent:
                 with torch.no_grad():
                     gov_action = np.array([0.1/0.5, 0.0/0.05, 0, 0, 0.1]) + np.random.normal(0,0.1, size=(5,))
                     temp = np.zeros((self.args.n_households, 2))
-                    temp[:, 0] = 0.9
+                    temp[:, 0] = 0.7
                     temp[:, 1] = 1 / 3
                     temp += np.random.normal(0,0.1, size=(self.args.n_households,2))
 
@@ -431,7 +438,12 @@ class BMFAC_agent:
         gov_action = gov_action.detach().cpu().numpy()[0]
         hou_action = hou_action.detach().cpu().numpy()[0]
         if self.fix_gov == True:
-            gov_action = np.array([0.1 / 0.2, 0.0 / 0.05, 0, 0, 0.1 / 0.5]) + np.random.normal(0, 0.1, size=(5,))
+            # gov_action = np.array([0.1 / 0.2, 0.0 / 0.05, 0, 0, 0.1 / 0.5]) + np.random.normal(0, 0.1, size=(5,))
+            temp = np.zeros((self.args.n_households, 2))
+            temp[:, 0] = 0.7
+            temp[:, 1] = 1 / 3
+
+            hou_action = temp * 2 - 1
 
         action = {self.eval_env.government.name: self.gov_action_max * gov_action,
                   self.eval_env.households.name: self.hou_action_max * hou_action}

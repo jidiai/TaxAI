@@ -88,12 +88,44 @@ class Critic(nn.Module):
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.q_value = nn.Linear(hidden_size, 1)
 
+        self.initialize_weights()
+    def initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.constant_(m.bias, 0.0)
+
     def forward(self, obs, action=None):
         inputs = torch.cat([obs, action], dim=1) if action is not None else obs
         x = F.relu(self.fc1(inputs))
         x = F.relu(self.fc2(x))
         output = self.q_value(x)
         return output
+
+# class Critic(nn.Module):
+#     def __init__(self, input_dims, hidden_size, action_dims=None):
+#         super(Critic, self).__init__()
+#         self.fc1 = nn.Linear(input_dims, hidden_size) if action_dims is None else nn.Linear(input_dims + action_dims, hidden_size)
+#         self.ln1 = nn.LayerNorm(hidden_size)
+#         self.fc2 = nn.Linear(hidden_size, hidden_size)
+#         self.ln2 = nn.LayerNorm(hidden_size)
+#         self.q_value = nn.Linear(hidden_size, 1)
+#
+#         self.initialize_weights()
+#
+#     def initialize_weights(self):
+#         for m in self.modules():
+#             if isinstance(m, nn.Linear):
+#                 nn.init.xavier_uniform_(m.weight)
+#                 nn.init.constant_(m.bias, 0.0)
+#
+#     def forward(self, obs, action=None):
+#         inputs = torch.cat([obs, action], dim=1) if action is not None else obs
+#         x = F.relu(self.ln1(self.fc1(inputs)))
+#         x = F.relu(self.ln2(self.fc2(x)))
+#         output = self.q_value(x)
+#         return output
+
 
 class SharedCritic(nn.Module):   # Q(s, a_g, a_h, \bar{a_h})
     def __init__(self, state_dim, hou_action_dim, hidden_size, num_agent):
@@ -118,55 +150,67 @@ class SharedCritic(nn.Module):   # Q(s, a_g, a_h, \bar{a_h})
         return output
 
 
-'''
-v0: government actor no GRU
-'''
-# class Actor(nn.Module):
+# class Actor(nn.Module):  # pi(s)  没有 mean action
+#     # scale the network
 #     def __init__(self, input_dims, action_dims, hidden_size, log_std_min, log_std_max):
 #         super(Actor, self).__init__()
-#         self.fc1 = nn.Linear(input_dims, hidden_size)
-#         self.fc2 = nn.Linear(hidden_size, hidden_size)
-#         self.mean = nn.Linear(hidden_size, action_dims)
-#         self.log_std = nn.Linear(hidden_size, action_dims)
+#         self.fc1 = nn.Linear(input_dims, 128)  # pi(observation, gov_a, top10_action, bot50_action)
+#         self.gru = GRU(128, 256, 1, 0.1)
+#         self.fc2 = nn.Linear(256, 128)
+#         self.tanh = nn.Tanh()
+#         self.mean = nn.Linear(128, action_dims)
+#         self.log_std = nn.Linear(128, action_dims)
 #         # the log_std_min and log_std_max
 #         self.log_std_min = log_std_min
 #         self.log_std_max = log_std_max
 #
+#
 #     def forward(self, obs):
-#         x = F.relu(self.fc1(obs))
-#         x = F.relu(self.fc2(x))
-#         mean = self.mean(x)
-#         log_std = self.log_std(x)
-#         # clamp the log std
+#         out = self.fc1(obs)
+#         out = self.gru(out)
+#         out = self.fc2(out)
+#         out = self.tanh(out)
+#         mean = self.mean(out).squeeze(1)
+#         log_std = self.log_std(out).squeeze(1)
 #         log_std = torch.clamp(log_std, min=self.log_std_min, max=self.log_std_max)
 #
 #         return (mean, torch.exp(log_std))
-
-class Actor(nn.Module):  # pi(s)  没有 mean action
-    # scale the network
+class Actor(nn.Module):
     def __init__(self, input_dims, action_dims, hidden_size, log_std_min, log_std_max):
         super(Actor, self).__init__()
-        self.fc1 = nn.Linear(input_dims, 128)  # pi(observation, gov_a, top10_action, bot50_action)
-        self.gru = GRU(128, 256, 1, 0.1)
+        self.fc1 = nn.Linear(input_dims, 128)
+        self.ln1 = nn.LayerNorm(128)
+        self.gru = nn.GRU(128, 256, 1, batch_first=True)
         self.fc2 = nn.Linear(256, 128)
+        self.ln2 = nn.LayerNorm(128)
         self.tanh = nn.Tanh()
         self.mean = nn.Linear(128, action_dims)
         self.log_std = nn.Linear(128, action_dims)
-        # the log_std_min and log_std_max
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
+        self.initialize_weights()
+
+    def initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.constant_(m.bias, 0.0)
 
 
     def forward(self, obs):
         out = self.fc1(obs)
-        out = self.gru(out)
+        out = self.ln1(out)
+        out, _ = self.gru(out.unsqueeze(0))
+        out = out.squeeze(0)
         out = self.fc2(out)
+        out = self.ln2(out)
         out = self.tanh(out)
-        mean = self.mean(out).squeeze(1)
-        log_std = self.log_std(out).squeeze(1)
+        mean = self.mean(out)
+        log_std = self.log_std(out)
         log_std = torch.clamp(log_std, min=self.log_std_min, max=self.log_std_max)
 
         return (mean, torch.exp(log_std))
+
 
 class GRU(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, dropout):
@@ -275,19 +319,52 @@ class MFSharedAgent(nn.Module):
 
         return (mean, torch.exp(log_std))
 
+# class MFCritic(nn.Module):
+#     def __init__(self, input_dims, hidden_size, gov_action_dims, house_action_dim):
+#         super(MFCritic, self).__init__()
+#         self.fc1 = nn.Linear(input_dims + gov_action_dims + house_action_dim, hidden_size)
+#         self.fc2 = nn.Linear(hidden_size, hidden_size)
+#         self.q_value = nn.Linear(hidden_size, 1)
+#         self.initialize_weights()
+#
+#     def initialize_weights(self):
+#         for m in self.modules():
+#             if isinstance(m, nn.Linear):
+#                 nn.init.xavier_uniform_(m.weight)
+#                 nn.init.constant_(m.bias, 0.0)
+#
+#     def forward(self, obs, gov_action, mean_house_action):
+#         inputs = torch.cat([obs, gov_action, mean_house_action], dim=1)
+#         x = F.relu(self.fc1(inputs))
+#         x = F.relu(self.fc2(x))
+#         output = self.q_value(x)
+#         return output
+
+import torch.nn as nn
+
 class MFCritic(nn.Module):
     def __init__(self, input_dims, hidden_size, gov_action_dims, house_action_dim):
         super(MFCritic, self).__init__()
         self.fc1 = nn.Linear(input_dims + gov_action_dims + house_action_dim, hidden_size)
+        self.ln1 = nn.LayerNorm(hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.ln2 = nn.LayerNorm(hidden_size)
         self.q_value = nn.Linear(hidden_size, 1)
+        self.initialize_weights()
+
+    def initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.constant_(m.bias, 0.0)
 
     def forward(self, obs, gov_action, mean_house_action):
         inputs = torch.cat([obs, gov_action, mean_house_action], dim=1)
-        x = F.relu(self.fc1(inputs))
-        x = F.relu(self.fc2(x))
+        x = self.ln1(F.relu(self.fc1(inputs)))
+        x = self.ln2(F.relu(self.fc2(x)))
         output = self.q_value(x)
         return output
+
 
 class MFSharedCritic(nn.Module):   # Q(s, a_g, a_h, \bar{a_h})
     def __init__(self, state_dim, gov_action_dim, hou_action_dim, hidden_size, num_agent):
@@ -386,45 +463,78 @@ class BMF_actor(nn.Module):
 
         return (mean, torch.exp(log_std))
 
-class BMF_actor_1(nn.Module):  # pi(s)  没有 mean action
-    # def __init__(self, input_size, gov_action_dim, house_action_dim, num_agent, log_std_min, log_std_max):
-    #     super(BMF_actor_1, self).__init__()
-    #     self.fc1 = nn.Linear(input_size+gov_action_dim, 64)  # pi(observation, gov_a, top10_action, bot50_action)
-    #     self.gru = GRU(64, 128, 1, 0.1)
-    #     self.fc2 = nn.Linear(128, 64)
-    #     self.tanh = nn.Tanh()
-    #     self.mean = nn.Linear(64, house_action_dim)
-    #     self.log_std = nn.Linear(64, house_action_dim)
-    #     # the log_std_min and log_std_max
-    #     self.log_std_min = log_std_min
-    #     self.log_std_max = log_std_max
-    #     self.num_agent = num_agent
-
-    # scale the network
+# class BMF_actor_1(nn.Module):  # pi(s)  没有 mean action
+#     def __init__(self, input_size, gov_action_dim, house_action_dim, num_agent, log_std_min, log_std_max):
+#         super(BMF_actor_1, self).__init__()
+#         self.fc1 = nn.Linear(input_size+gov_action_dim, 128)  # pi(observation, gov_a, top10_action, bot50_action)
+#         self.gru = GRU(128, 256, 1, 0.1)
+#         self.fc2 = nn.Linear(256, 128)
+#         self.tanh = nn.Tanh()
+#         self.mean = nn.Linear(128, house_action_dim)
+#         self.log_std = nn.Linear(128, house_action_dim)
+#         # the log_std_min and log_std_max
+#         self.log_std_min = log_std_min
+#         self.log_std_max = log_std_max
+#         self.num_agent = num_agent
+#         self.initialize_weights()
+#
+#     def initialize_weights(self):
+#         for m in self.modules():
+#             if isinstance(m, nn.Linear):
+#                 nn.init.xavier_uniform_(m.weight)
+#                 nn.init.constant_(m.bias, 0.0)
+#
+#     def forward(self, global_state, private_state, gov_action, update=False):
+#         if update == True:
+#             global_state = global_state.unsqueeze(1)
+#             gov_action = gov_action.unsqueeze(1)
+#
+#         n_global_obs = global_state.repeat(1, self.num_agent, 1)
+#         n_gov_action = gov_action.repeat(1, self.num_agent, 1)
+#         inputs = torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)
+#         out = self.fc1(inputs)
+#         out = self.gru(out)
+#         out = self.fc2(out)
+#         out = self.tanh(out)
+#         mean = self.mean(out)
+#         log_std = self.log_std(out)
+#         log_std = torch.clamp(log_std, min=self.log_std_min, max=self.log_std_max)
+#
+#         return (mean, torch.exp(log_std))
+class BMF_actor_1(nn.Module):
     def __init__(self, input_size, gov_action_dim, house_action_dim, num_agent, log_std_min, log_std_max):
         super(BMF_actor_1, self).__init__()
-        self.fc1 = nn.Linear(input_size+gov_action_dim, 128)  # pi(observation, gov_a, top10_action, bot50_action)
-        self.gru = GRU(128, 256, 1, 0.1)
+        self.fc1 = nn.Linear(input_size + gov_action_dim, 128)
+        self.ln1 = nn.LayerNorm(128)
+        self.gru = nn.GRU(128, 256, 1, batch_first=True)
         self.fc2 = nn.Linear(256, 128)
+        self.ln2 = nn.LayerNorm(128)
         self.tanh = nn.Tanh()
         self.mean = nn.Linear(128, house_action_dim)
         self.log_std = nn.Linear(128, house_action_dim)
-        # the log_std_min and log_std_max
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
         self.num_agent = num_agent
+        self.initialize_weights()
+
+    def initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.constant_(m.bias, 0.0)
 
     def forward(self, global_state, private_state, gov_action, update=False):
-        if update == True:
+        if update:
             global_state = global_state.unsqueeze(1)
             gov_action = gov_action.unsqueeze(1)
 
         n_global_obs = global_state.repeat(1, self.num_agent, 1)
         n_gov_action = gov_action.repeat(1, self.num_agent, 1)
         inputs = torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)
-        out = self.fc1(inputs)
-        out = self.gru(out)
-        out = self.fc2(out)
+        out = self.ln1(self.fc1(inputs))
+        out, _ = self.gru(out)
+        out = out.squeeze(1)
+        out = self.ln2(self.fc2(out))
         out = self.tanh(out)
         mean = self.mean(out)
         log_std = self.log_std(out)
@@ -433,16 +543,24 @@ class BMF_actor_1(nn.Module):  # pi(s)  没有 mean action
         return (mean, torch.exp(log_std))
 
 
-class BMF_critic(nn.Module):   # Q(s, a_g, a_h, \bar{a_h})
+class BMF_critic(nn.Module):
     def __init__(self, state_dim, gov_action_dim, hou_action_dim, hidden_size, num_agent):
         super(BMF_critic, self).__init__()
         self.fc1 = nn.Linear(state_dim + gov_action_dim + 3*hou_action_dim, hidden_size)
+        self.ln1 = nn.LayerNorm(hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.ln2 = nn.LayerNorm(hidden_size)
         self.q_value = nn.Linear(hidden_size, 1)
         self.num_agent = num_agent
+        self.initialize_weights()
+
+    def initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.constant_(m.bias, 0.0)
 
     def forward(self, global_state, private_state, gov_action, hou_action, mean_house_action):
-
         global_state = global_state.unsqueeze(1)
         gov_action = gov_action.unsqueeze(1)
         mean_house_action = mean_house_action.unsqueeze(1)
@@ -451,9 +569,41 @@ class BMF_critic(nn.Module):   # Q(s, a_g, a_h, \bar{a_h})
         n_gov_action = gov_action.repeat(1, self.num_agent, 1)
         n_mean_house_action = mean_house_action.repeat(1, self.num_agent, 1)
 
-        inputs = torch.cat([n_global_obs, private_state, n_gov_action, hou_action, n_mean_house_action], dim=-1)  # 修改维度
-        x = F.relu(self.fc1(inputs))
-        x = F.relu(self.fc2(x))
+        inputs = torch.cat([n_global_obs, private_state, n_gov_action, hou_action, n_mean_house_action], dim=-1)
+        x = self.ln1(F.relu(self.fc1(inputs)))
+        x = self.ln2(F.relu(self.fc2(x)))
         output = self.q_value(x)
         return output
+
+
+# class BMF_critic(nn.Module):   # Q(s, a_g, a_h, \bar{a_h})
+#     def __init__(self, state_dim, gov_action_dim, hou_action_dim, hidden_size, num_agent):
+#         super(BMF_critic, self).__init__()
+#         self.fc1 = nn.Linear(state_dim + gov_action_dim + 3*hou_action_dim, hidden_size)
+#         self.fc2 = nn.Linear(hidden_size, hidden_size)
+#         self.q_value = nn.Linear(hidden_size, 1)
+#         self.num_agent = num_agent
+#         self.initialize_weights()
+#
+#     def initialize_weights(self):
+#         for m in self.modules():
+#             if isinstance(m, nn.Linear):
+#                 nn.init.xavier_uniform_(m.weight)
+#                 nn.init.constant_(m.bias, 0.0)
+#
+#     def forward(self, global_state, private_state, gov_action, hou_action, mean_house_action):
+#
+#         global_state = global_state.unsqueeze(1)
+#         gov_action = gov_action.unsqueeze(1)
+#         mean_house_action = mean_house_action.unsqueeze(1)
+#
+#         n_global_obs = global_state.repeat(1, self.num_agent, 1)
+#         n_gov_action = gov_action.repeat(1, self.num_agent, 1)
+#         n_mean_house_action = mean_house_action.repeat(1, self.num_agent, 1)
+#
+#         inputs = torch.cat([n_global_obs, private_state, n_gov_action, hou_action, n_mean_house_action], dim=-1)  # 修改维度
+#         x = F.relu(self.fc1(inputs))
+#         x = F.relu(self.fc2(x))
+#         output = self.q_value(x)
+#         return output
 

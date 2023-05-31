@@ -110,7 +110,7 @@ class economic_society:
         # households action
         multi_actions = self.action_wrapper(self.valid_action_dict[self.households.name])
         # saving_p = np.array(multi_actions[:, 0])[:,np.newaxis,...] * 0.3 + 0.7
-        saving_p = np.array(multi_actions[:, 0])[:,np.newaxis,...] * 0.5 + 0.5
+        saving_p = np.array(multi_actions[:, 0])[:,np.newaxis,...]* 0.5 + 0.5
         self.workingHours = np.array(multi_actions[:, 1])[:,np.newaxis,...]
         self.ht = self.workinghours_wrapper(self.workingHours)
 
@@ -130,10 +130,13 @@ class economic_society:
 
         # compute tax
         aggregate_consumption = (1 - saving_p) * total_wealth
-        if aggregate_consumption.min() <= 0:
-            print(1)
         choose_consumption = 1/(1 + self.consumption_tax_rate) * aggregate_consumption
 
+        # if np.sum(choose_consumption) + Gt > self.GDP:
+        #     # self.done = True
+        #     self.consumption = choose_consumption/(np.sum(choose_consumption) + Gt) * self.GDP
+        # else:
+        #     self.consumption = choose_consumption
         if np.sum(choose_consumption) + Gt > self.GDP:
             self.done = True
         self.consumption = choose_consumption
@@ -155,8 +158,10 @@ class economic_society:
         self.households_reward = self.utility_function(self.consumption, self.ht)
         self.government_reward = self.gov_reward()
         # 如果gini>0.8, 有人破产， GDP过低 都会结束
+        # self.done = self.done or bool(self.wealth_gini > 0.9 or self.income_gini > 0.9 or math.isnan(self.government_reward) or
+        #                               math.isnan(np.mean(self.households_reward)) or np.min(self.households.at_next) < 0 or self.Bt_next < 0 or self.Kt_next < 0)
         self.done = self.done or bool(self.wealth_gini > 0.9 or self.income_gini>0.9 or math.isnan(self.government_reward) or
-                                      math.isnan(np.mean(self.households_reward)) or np.min(self.households.at_next) < 0 or self.Bt_next <0 or self.Kt_next < 0)
+                                      math.isnan(np.mean(self.households_reward)) or np.min(self.households.at_next) < 0 or self.Kt_next < 0)
 
         if math.isnan(self.government_reward) or math.isnan(np.mean(self.households_reward)):
             self.done = True
@@ -271,17 +276,42 @@ class economic_society:
         current_utility = u_c - u_h
         return current_utility
 
+    # def gini_coef(self, wealths):
+    #     '''
+    #     cite: https://github.com/stephenhky/econ_inequality/blob/master/ginicoef.py
+    #     '''
+    #     cum_wealths = np.cumsum(sorted(np.append(wealths, 0)))
+    #     sum_wealths = cum_wealths[-1]
+    #     xarray = np.array(range(0, len(cum_wealths))) / np.float(len(cum_wealths) - 1)
+    #     yarray = cum_wealths / sum_wealths
+    #     B = np.trapz(yarray, x=xarray)
+    #     A = 0.5 - B
+    #     return A / (A + B)
+    import numpy as np
+    import matplotlib.pyplot as plt
+
     def gini_coef(self, wealths):
-        '''
-        cite: https://github.com/stephenhky/econ_inequality/blob/master/ginicoef.py
-        '''
         cum_wealths = np.cumsum(sorted(np.append(wealths, 0)))
         sum_wealths = cum_wealths[-1]
         xarray = np.array(range(0, len(cum_wealths))) / np.float(len(cum_wealths) - 1)
         yarray = cum_wealths / sum_wealths
         B = np.trapz(yarray, x=xarray)
         A = 0.5 - B
-        return A / (A + B)
+        gini_coef = A / (A + B)
+        #
+        # import matplotlib.pyplot as plt
+        # # Plotting the Lorenz curve
+        # plt.plot(xarray, yarray, label='Lorenz curve')
+        # plt.plot([0, 1], [0, 1], color='gray', linestyle='--')  # Line of perfect equality
+        # plt.fill_between(xarray, yarray, alpha=0.5, color='lightblue')
+        # plt.xlabel('Cumulative Share of Population')
+        # plt.ylabel('Cumulative Share of Wealth')
+        # plt.title('Lorenz Curve')
+        # plt.legend()
+        # plt.show()
+    
+        return gini_coef
+
     def stacked_data(self, wealths):
         sorted_wealth = np.sort(wealths,axis=0)/np.sum(wealths)
         top_10 = sorted_wealth[int(0.9*self.households.n_households):].sum()

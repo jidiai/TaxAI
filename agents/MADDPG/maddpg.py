@@ -14,14 +14,14 @@ class MADDPG:
 
         # create the network
         if agent_id == self.args.n_agents-1:   # government agent
-            self.actor_network = Actor(args.gov_obs_dim, args.gov_action_dim)
-            self.actor_target_network = Actor(args.gov_obs_dim, args.gov_action_dim)
+            self.actor_network = Actor(args.gov_obs_dim, args.gov_action_dim, hidden_size=args.hidden_size)
+            self.actor_target_network = Actor(args.gov_obs_dim, args.gov_action_dim, hidden_size=args.hidden_size)
         else:  # household agent
-            self.actor_network = Actor(args.house_obs_dim, args.house_action_dim)
-            self.actor_target_network = Actor(args.house_obs_dim, args.house_action_dim)
+            self.actor_network = Actor(args.house_obs_dim, args.house_action_dim, hidden_size=args.hidden_size)
+            self.actor_target_network = Actor(args.house_obs_dim, args.house_action_dim, hidden_size=args.hidden_size)
         
-        self.critic_network = Critic(critic_input_size)
-        self.critic_target_network = Critic(critic_input_size)
+        self.critic_network = Critic(critic_input_size, hidden_size=args.hidden_size)
+        self.critic_target_network = Critic(critic_input_size, hidden_size=args.hidden_size)
 
         # load the weights into the target networks
         self.actor_target_network.load_state_dict(self.actor_network.state_dict())

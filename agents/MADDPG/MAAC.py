@@ -74,11 +74,10 @@ class maddpg_agent:
         epochs = []
         wealth_stack = []
         income_stack = []
+        sum_actor_loss = 0
+        sum_critic_loss = 0
 
         for epoch in range(self.args.n_epochs):
-            if epoch == 1:
-                print(1)
-            print("epoch:", epoch)
             # for each epoch, it will reset the environment
             for t in range(self.args.epoch_length):
                 '''
@@ -108,18 +107,18 @@ class maddpg_agent:
                     # if done, reset the environment
                     global_obs, private_obs = self.envs.reset()
 
-            # after collect the samples, start to update the network
-            transitions = self.buffer.sample(self.args.batch_size)
-            sum_actor_loss = 0
-            sum_critic_loss = 0
-            for agent in self.agents:
-                other_agents = self.agents.copy()
-                other_agents.remove(agent)
-                actor_loss, critic_loss = agent.train(transitions, other_agents)
-                sum_actor_loss += actor_loss
-                sum_critic_loss += critic_loss
-
-
+                if epoch > 10:
+                    for _ in range(self.args.update_cycles):
+                        # after collect the samples, start to update the network
+                        transitions = self.buffer.sample(self.args.batch_size)
+                        sum_actor_loss = 0
+                        sum_critic_loss = 0
+                        for agent in self.agents:
+                            other_agents = self.agents.copy()
+                            other_agents.remove(agent)
+                            actor_loss, critic_loss = agent.train(transitions, other_agents)
+                            sum_actor_loss += actor_loss
+                            sum_critic_loss += critic_loss
             # print the log information
             if epoch % self.args.display_interval == 0:
                 # start to do the evaluation

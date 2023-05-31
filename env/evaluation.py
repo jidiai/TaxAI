@@ -79,11 +79,17 @@ def get_class_parameters(cls):
 def save_parameters(path, step, epoch, cls):
 
     parameters = get_class_parameters(cls)
+    gov_para = get_class_parameters(cls.government)
+    households_para = get_class_parameters(cls.households)
     file_path = str(path) + '/epoch_' + str(epoch) + 'step_' + str(step) + '_parameters.txt'
 
     # 将参数保存到文件
     with open(file_path, 'w') as file:
         for param_name, param_value in parameters.items():
+            file.write(f"{param_name}: {param_value}\n")
+        for param_name, param_value in gov_para.items():
+            file.write(f"{param_name}: {param_value}\n")
+        for param_name, param_value in households_para.items():
             file.write(f"{param_name}: {param_value}\n")
 
     print(f"参数已保存到文件: {file_path}")

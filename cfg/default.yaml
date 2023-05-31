@@ -43,8 +43,8 @@ Trainer:
   log_std_max:  2
   hidden_size:  256
   cuda: True
-  q_lr: 3e-3
-  p_lr: 3e-3
+  q_lr: 3e-4
+  p_lr: 3e-4
   buffer_size:  1e6
   env_name: 'wealth_distribution'
   init_exploration_policy:  'gaussian'
@@ -67,14 +67,10 @@ Trainer:
   ent_coef: 0.01
   max_grad_norm: 0.5
   update_freq: 10
-  initial_train: 10
+  initial_train: 100
   noise_rate: 0.1
   epsilon: 0.1
   save_interval: 100
-
-
-
-
 
 
 
