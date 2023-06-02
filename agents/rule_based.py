@@ -39,7 +39,7 @@ class rule_agent:
 
         self.model_path, _ = make_logpath(algo="rule_based",n=self.args.n_households)
         save_args(path=self.model_path, args=self.args)
-        self.wandb = False
+        self.wandb = True
         if self.wandb:
             wandb.init(
                 config=self.args,
@@ -66,7 +66,7 @@ class rule_agent:
             if epoch % self.args.display_interval == 0:
 
                 # start to do the evaluation
-                mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years, avg_wealth_stacked, avg_income_stacked, avg_wealth = self._evaluate_agent()
+                mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years = self._evaluate_agent()
                 # store rewards and step
                 now_step = (epoch + 1) * self.args.epoch_length
                 gov_rew.append(mean_gov_rewards)
@@ -75,11 +75,7 @@ class rule_agent:
                 np.savetxt(str(self.model_path) + "/house_reward.txt", house_rew)
                 epochs.append(now_step)
                 np.savetxt(str(self.model_path) + "/steps.txt", epochs)
-                wealth_stack.append(avg_wealth_stacked)
-                income_stack.append(avg_income_stacked)
 
-                np.savetxt(str(self.model_path) + "/wealth_stack.txt", wealth_stack)
-                np.savetxt(str(self.model_path) + "/income_stack.txt", income_stack)
                 # np.savetxt(str(self.model_path) + "/wealth_set.txt", avg_wealth.reshape(5,100))
 
                 if self.wandb:
@@ -103,30 +99,30 @@ class rule_agent:
     def _evaluate_agent(self):
         total_gov_reward = 0
         total_house_reward = 0
-        episode_mean_tax = []
-        episode_mean_wealth = []
-        episode_mean_post_income = []
-        episode_gdp = []
-        episode_income_gini = []
-        episode_wealth_gini = []
-        wealth_stacked_data = []
-        income_stacked_data = []
-        wealth_sum = []
-        
         total_steps = 0
-
-        for _ in range(self.args.eval_episodes):
+        mean_tax = 0
+        mean_wealth = 0
+        mean_post_income = 0
+        gdp = 0
+        income_gini = 0
+        wealth_gini = 0
+        for epoch_i in range(self.args.eval_episodes):
             global_obs, private_obs = self.eval_env.reset()
             episode_gov_reward = 0
             episode_mean_house_reward = 0
             step_count = 0
-            welath_set = []
+            episode_mean_tax = []
+            episode_mean_wealth = []
+            episode_mean_post_income = []
+            episode_gdp = []
+            episode_income_gini = []
+            episode_wealth_gini = []
+        
             while True:
-
                 with torch.no_grad():
                     action = self._evaluate_get_action(global_obs, private_obs)
                     next_global_obs, next_private_obs, gov_reward, house_reward, done = self.eval_env.step(action)
-
+            
                 step_count += 1
                 episode_gov_reward += gov_reward
                 episode_mean_house_reward += np.mean(house_reward)
@@ -136,42 +132,44 @@ class rule_agent:
                 episode_gdp.append(self.eval_env.per_household_gdp)
                 episode_income_gini.append(self.eval_env.income_gini)
                 episode_wealth_gini.append(self.eval_env.wealth_gini)
-                # wealth_satcked_data:
-                wealth_stacked_data.append(self.eval_env.stacked_data(self.eval_env.households.at_next))
-                income_stacked_data.append(self.eval_env.stacked_data(self.eval_env.post_income))
-                # if step_count == 1 or step_count == 5 or step_count == 10 or step_count == 15 or step_count == 20:
-                #     welath_set.append(self.eval_env.households.at_next)
-                # self.eval_env.render()
                 if done:
                     break
-
+                if step_count == 1 or step_count == 10 or step_count == 30 or step_count == 300:
+                    save_parameters(self.model_path, step_count, epoch_i, self.eval_env)
+            
                 global_obs = next_global_obs
                 private_obs = next_private_obs
-
+        
             total_gov_reward += episode_gov_reward
             total_house_reward += episode_mean_house_reward
             total_steps += step_count
-            # wealth_sum.append(welath_set)
-
+            mean_tax += np.mean(episode_mean_tax)
+            mean_wealth += np.mean(episode_mean_wealth)
+            mean_post_income += np.mean(episode_mean_post_income)
+            gdp += np.mean(episode_gdp)
+            income_gini += np.mean(episode_income_gini)
+            wealth_gini += np.mean(episode_wealth_gini)
+    
         avg_gov_reward = total_gov_reward / self.args.eval_episodes
         avg_house_reward = total_house_reward / self.args.eval_episodes
         mean_step = total_steps / self.args.eval_episodes
-        avg_mean_tax = np.mean(episode_mean_tax)
-        avg_mean_wealth = np.mean(episode_mean_wealth)
-        avg_mean_post_income = np.mean(episode_mean_post_income)
-        avg_gdp = np.mean(episode_gdp)
-        avg_income_gini = np.mean(episode_income_gini)
-        avg_wealth_gini = np.mean(episode_wealth_gini)
-        avg_wealth_stacked = np.mean(wealth_stacked_data, axis=0)
-        avg_income_stacked = np.mean(income_stacked_data, axis=0)
-        # avg_wealth_set = np.mean(wealth_sum, axis=0)
-        avg_wealth_set = 0
-        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, mean_step, avg_wealth_stacked, avg_income_stacked, avg_wealth_set
-
+        avg_mean_tax = mean_tax / self.args.eval_episodes
+        avg_mean_wealth = mean_wealth / self.args.eval_episodes
+        avg_mean_post_income = mean_post_income / self.args.eval_episodes
+        avg_gdp = gdp / self.args.eval_episodes
+        avg_income_gini = income_gini / self.args.eval_episodes
+        avg_wealth_gini = wealth_gini / self.args.eval_episodes
+        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, \
+               avg_wealth_gini, mean_step
     def _evaluate_get_action(self, global_obs, private_obs):
         # gov_action = np.array([0.5, 0.01, 0.5, 0.01, 0.189/0.5])
-        gov_action = np.array([0.5, 0., 0.5, 0, 0/0.5])
+        gov_action = np.array([0, 0., 0, 0, 0/0.5])
+        # gov_action = np.random.random(5)
         temp = np.random.random((self.args.n_households, self.envs.households.action_space.shape[1]))
+        # temp[:, 0] = 0.7
+        # temp[:, 1] = 1 / 3
+        #
+        # hou_action = temp * 2 - 1
 
         hou_action = temp * 2 - 1
         

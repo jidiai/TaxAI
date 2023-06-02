@@ -85,7 +85,7 @@ class economic_society:
         input: (-1,1)之间
         output: (0, 0.9999)
         '''
-        return np.clip((actions+1)/2, 0.001, 0.99)
+        return np.clip((actions+1)/2, 0., 0.99)
 
     def workinghours_wrapper(self, ht):
         return self.hours_max * ht
@@ -106,6 +106,8 @@ class economic_society:
         self.government.tau *= self.tau_max
         self.government.tau_a *= self.tau_max
         self.Gt_prob *= 0.3
+        if self.action_wrapper(self.valid_action_dict[self.government.name]).all() == 0:
+            self.consumption_tax_rate = 0
 
         # households action
         multi_actions = self.action_wrapper(self.valid_action_dict[self.households.name])

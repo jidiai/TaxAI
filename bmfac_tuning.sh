@@ -4,7 +4,7 @@
 #python main.py --device-num 0 --n_households 10 --alg "maddpg" --task "gini" --seed 2 --hidden_size 128 --q_lr 3e-3 --p_lr 3e-3 --batch_size 32
 #python main.py --device-num 0 --n_households 10 --alg "maddpg" --task "gini" --seed 2 --hidden_size 256 --q_lr 3e-3 --p_lr 3e-3 --batch_size 32
 #
-#python main.py --device-num 1 --n_households 100 --alg "bmfac" --task "gdp" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+#python main.py --device-num 0 --n_households 100 --alg "maddpg" --task "gdp" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
 #python main.py --device-num 0 --n_households 10 --alg "maddpg" --task "gini" --seed 2 --hidden_size 64 --q_lr 3e-3 --p_lr 3e-3 --batch_size 32
 #python main.py --device-num 0 --n_households 10 --alg "maddpg" --task "gdp" --seed 2
 #python main.py --device-num 0 --n_households 10 --alg "maddpg" --task "social_welfare" --seed 2

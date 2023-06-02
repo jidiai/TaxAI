@@ -29,6 +29,9 @@
           <mappings>
             <mapping deploy="/home/mqr/code/AI-TaxingPolicy" local="$PROJECT_DIR$" />
           </mappings>
+          <excludedPaths>
+            <excludedPath path="/home/mqr/code/AI-TaxingPolicy/agents/models/rule_based/10/run28/epoch_0_step_1_10_gdp_parameters.txt" />
+          </excludedPaths>
         </serverdata>
       </paths>
     </serverData>

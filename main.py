@@ -8,7 +8,8 @@ from agents.independent_ppo import ppo_agent
 from agents.calibration import calibration_agent
 from agents.MF_bilevel import mf_agent
 from agents.BMFAC import BMFAC_agent
-from agents.MADDPG.MAAC import maddpg_agent
+# from agents.MADDPG.MAAC import maddpg_agent
+from agents.MADDPG_block.MAAC import maddpg_agent
 from utils.seeds import set_seeds
 from arguments import get_args
 import os
@@ -30,7 +31,7 @@ def parse_args():
     parser.add_argument('--q_lr', type=float, default=3e-4, help='[3e-3, 3e-4, 3e-5]')
     parser.add_argument('--p_lr', type=float, default=3e-4, help='[3e-3, 3e-4, 3e-5]')
     parser.add_argument('--batch_size', type=int, default=64, help='[32, 64, 128, 256]')
-    parser.add_argument('--update_cycles', type=int, default=50, help='[10，100，1000]')
+    parser.add_argument('--update_cycles', type=int, default=100, help='[10，100，1000]')
     parser.add_argument('--update_freq', type=int, default=10, help='[10，20，30]')
     parser.add_argument('--initial_train', type=int, default=10, help='[10，100，200]')
     # parser.add_argument('--update_freq', type=int, default=1, help='the number of total households')

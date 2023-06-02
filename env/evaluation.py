@@ -10,23 +10,26 @@ import inspect
 def _evaluate_agent(self):
     total_gov_reward = 0
     total_house_reward = 0
-    episode_mean_tax = []
-    episode_mean_wealth = []
-    episode_mean_post_income = []
-    episode_gdp = []
-    episode_income_gini = []
-    episode_wealth_gini = []
-    wealth_stacked_data = []
-    income_stacked_data = []
     total_steps = 0
-    
-    for _ in range(self.args.eval_episodes):
+    mean_tax = 0
+    mean_wealth = 0
+    mean_post_income = 0
+    gdp = 0
+    income_gini = 0
+    wealth_gini = 0
+    for epoch_i in range(self.args.eval_episodes):
         global_obs, private_obs = self.eval_env.reset()
         episode_gov_reward = 0
         episode_mean_house_reward = 0
         step_count = 0
+        episode_mean_tax = []
+        episode_mean_wealth = []
+        episode_mean_post_income = []
+        episode_gdp = []
+        episode_income_gini = []
+        episode_wealth_gini = []
+        
         while True:
-            
             with torch.no_grad():
                 action = self._evaluate_get_action(global_obs, private_obs)
                 next_global_obs, next_private_obs, gov_reward, house_reward, done = self.eval_env.step(action)
@@ -40,12 +43,10 @@ def _evaluate_agent(self):
             episode_gdp.append(self.eval_env.per_household_gdp)
             episode_income_gini.append(self.eval_env.income_gini)
             episode_wealth_gini.append(self.eval_env.wealth_gini)
-            # wealth_satcked_data:
-            wealth_stacked_data.append(self.eval_env.stacked_data(self.eval_env.households.at_next))
-            income_stacked_data.append(self.eval_env.stacked_data(self.eval_env.post_income))
-            # self.eval_env.render()
             if done:
                 break
+            if step_count == 1 or step_count == 10 or step_count == 30 or step_count == 300:
+                save_parameters(self.model_path, step_count, epoch_i, self.eval_env)
             
             global_obs = next_global_obs
             private_obs = next_private_obs
@@ -53,20 +54,24 @@ def _evaluate_agent(self):
         total_gov_reward += episode_gov_reward
         total_house_reward += episode_mean_house_reward
         total_steps += step_count
+        mean_tax += np.mean(episode_mean_tax)
+        mean_wealth += np.mean(episode_mean_wealth)
+        mean_post_income += np.mean(episode_mean_post_income)
+        gdp += np.mean(episode_gdp)
+        income_gini += np.mean(episode_income_gini)
+        wealth_gini += np.mean(episode_wealth_gini)
+    
     avg_gov_reward = total_gov_reward / self.args.eval_episodes
     avg_house_reward = total_house_reward / self.args.eval_episodes
     mean_step = total_steps / self.args.eval_episodes
-    avg_mean_tax = np.mean(episode_mean_tax)
-    avg_mean_wealth = np.mean(episode_mean_wealth)
-    avg_mean_post_income = np.mean(episode_mean_post_income)
-    avg_gdp = np.mean(episode_gdp)
-    avg_income_gini = np.mean(episode_income_gini)
-    avg_wealth_gini = np.mean(episode_wealth_gini)
-    avg_wealth_stacked = np.mean(wealth_stacked_data, axis=0)
-    avg_income_stacked = np.mean(income_stacked_data, axis=0)
-    return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, mean_step, avg_wealth_stacked, avg_income_stacked
-
-
+    avg_mean_tax = mean_tax / self.args.eval_episodes
+    avg_mean_wealth = mean_wealth / self.args.eval_episodes
+    avg_mean_post_income = mean_post_income / self.args.eval_episodes
+    avg_gdp = gdp / self.args.eval_episodes
+    avg_income_gini = income_gini / self.args.eval_episodes
+    avg_wealth_gini = wealth_gini / self.args.eval_episodes
+    return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, \
+           avg_wealth_gini, mean_step
 # 获取类的参数
 def get_class_parameters(cls):
     parameters = {}
@@ -79,17 +84,9 @@ def get_class_parameters(cls):
 def save_parameters(path, step, epoch, cls):
 
     parameters = get_class_parameters(cls)
-    gov_para = get_class_parameters(cls.government)
     households_para = get_class_parameters(cls.households)
-    file_path = str(path) + '/epoch_' + str(epoch) + 'step_' + str(step) + '_parameters.txt'
+    file_path = str(path) + '/epoch_' + str(epoch) + '_step_' + str(step) + '_' + str(households_para['n_households']) +'_' + parameters["gov_task"] +'_parameters.pkl'
 
-    # 将参数保存到文件
-    with open(file_path, 'w') as file:
-        for param_name, param_value in parameters.items():
-            file.write(f"{param_name}: {param_value}\n")
-        for param_name, param_value in gov_para.items():
-            file.write(f"{param_name}: {param_value}\n")
-        for param_name, param_value in households_para.items():
-            file.write(f"{param_name}: {param_value}\n")
-
-    print(f"参数已保存到文件: {file_path}")
+    import pickle
+    with open(file_path, 'wb') as f:
+        pickle.dump(parameters, f)

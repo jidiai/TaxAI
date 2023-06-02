@@ -13,7 +13,7 @@ class MADDPG:
         critic_input_size = self.args.gov_action_dim + self.args.house_action_dim * self.args.n_households + self.args.gov_obs_dim + (self.args.house_obs_dim-self.args.gov_obs_dim) * self.args.n_households
 
         # create the network
-        if agent_id == self.args.n_agents-1:   # government agent
+        if agent_id == self.args.agent_block_num-1:   # government agent
             self.actor_network = Actor(args.gov_obs_dim, args.gov_action_dim, hidden_size=args.hidden_size)
             self.actor_target_network = Actor(args.gov_obs_dim, args.gov_action_dim, hidden_size=args.hidden_size)
         else:  # household agent
@@ -40,7 +40,7 @@ class MADDPG:
 
     def select_action(self, o, noise_rate, epsilon):
         if np.random.uniform() < epsilon:
-            if self.agent_id == self.args.n_agents-1:
+            if self.agent_id == self.args.agent_block_num-1:
                 action_dim = self.args.gov_action_dim
             else:
                 action_dim = self.args.house_action_dim
@@ -50,7 +50,7 @@ class MADDPG:
             pi = self.actor_network(o).squeeze(0)
             # print('{} : {}'.format(self.name, pi))
             u = pi.detach().cpu().numpy()
-            noise = noise_rate * np.random.randn(u.shape[0])  # gaussian noise
+            noise = noise_rate * np.random.rand(*u.shape)  # gaussian noise
             u += noise
             u = np.clip(u, -1, +1)
         return u.copy()
@@ -62,8 +62,14 @@ class MADDPG:
 
         for target_param, param in zip(self.critic_target_network.parameters(), self.critic_network.parameters()):
             target_param.data.copy_((1 - self.args.tau) * target_param.data + self.args.tau * param.data)
-
+    
+    def households_obs_sort(self, private_obs):
+        # 根据wealth 排序observation
+        sorted_indices = torch.argsort(private_obs[:,:,-1], descending=True)
+        return sorted_indices
+    
     # update the network
+    # todo 只优化三次network，每次用多个agent的batch data更新
     def train(self, transitions, other_agents):
         global_obs, private_obs, gov_action, hou_action, gov_reward, house_reward, next_global_obs, next_private_obs, done = transitions
         
@@ -77,52 +83,71 @@ class MADDPG:
         next_private_obses = torch.tensor(next_private_obs, dtype=torch.float32, device='cuda' if self.args.cuda else 'cpu')
         inverse_dones = torch.tensor(1 - done, dtype=torch.float32,
                                      device='cuda' if self.args.cuda else 'cpu').unsqueeze(-1)
+
+        num_set = range(0, self.args.n_households)
+        num = []
+        num.append(num_set[:int(0.1 * self.args.n_households)])
+        num.append(num_set[int(0.1 * self.args.n_households):int(0.5 * self.args.n_households)])
+        num.append(num_set[int(0.5 * self.args.n_households):])
+        # num.append(1)
+        # todo 给batch data 排序
+        sorted_index = self.households_obs_sort(private_obses)
+        private_obses = private_obses[np.arange(self.args.batch_size)[:, None], sorted_index]
+        hou_actions = hou_actions[np.arange(self.args.batch_size)[:, None], sorted_index]
+        house_rewards = house_rewards[np.arange(self.args.batch_size)[:, None], sorted_index]
+        next_private_obses = next_private_obses[np.arange(self.args.batch_size)[:, None], sorted_index]
         
-        if self.agent_id == self.args.n_agents - 1:  # government agent
+        if self.agent_id == self.args.agent_block_num - 1:  # government agent
             r = gov_rewards.view(-1, 1)
         else:
-            r = house_rewards[:, self.agent_id]
+            r = house_rewards[:, num[self.agent_id]]
         # 用来装每个agent经验中的各项
-        o = torch.cat((private_obses.view(self.args.batch_size, -1), global_obses), dim=1)
-        u = torch.cat((hou_actions.view(self.args.batch_size, -1), gov_actions), dim=1)
-        o_next = torch.cat((next_private_obses.view(self.args.batch_size, -1), next_global_obses), dim=1)
+        o = torch.cat((private_obses.reshape(self.args.batch_size, -1), global_obses), dim=-1)
+        u = torch.cat((hou_actions.reshape(self.args.batch_size, -1), gov_actions), dim=-1)
+        n_next_global_obses = next_global_obses.unsqueeze(1).repeat(1, self.args.n_households, 1)
+        o_next = torch.cat((next_private_obses,n_next_global_obses), dim=-1)
 
         # calculate the target Q value function
         u_next = []
+        this_next_o = []
         with torch.no_grad():
             # 得到下一个状态对应的动作
             index = 0
-
-            for agent_id in range(self.args.n_agents):
-                if agent_id == self.args.n_agents - 1:
-                    this_next_o = next_global_obses
+            for agent_id in range(self.args.agent_block_num):
+                if agent_id == self.args.agent_block_num - 1:
+                    this_next_o.append(next_global_obses)
                 else:
-                    this_next_o = torch.cat((next_global_obses, next_private_obses[:, agent_id]), dim=1)
-                    
+                    this_next_o.append(o_next[:, num[agent_id]])
                 if agent_id == self.agent_id:
-                    u_next.append(self.actor_target_network(this_next_o))
+                    u_next.append(self.actor_target_network(this_next_o[agent_id]).reshape(self.args.batch_size, -1))
                 else:
                     # 因为传入的other_agents要比总数少一个，可能中间某个agent是当前agent，不能遍历去选择动作
-                    u_next.append(other_agents[index].actor_target_network(this_next_o))
+                    u_next.append(other_agents[index].actor_target_network(this_next_o[agent_id]).reshape(self.args.batch_size, -1))
                     index += 1
             u_next = torch.cat(u_next, dim=1)
-            q_next = self.critic_target_network(o_next, u_next).detach()
-
-            target_q = (r + self.args.gamma * q_next).detach()
+            flatten_o_next = torch.cat((next_private_obses.reshape(self.args.batch_size,-1),next_global_obses), dim=-1)
+            q_next = self.critic_target_network(flatten_o_next, u_next).detach()
+            if self.agent_id == self.args.agent_block_num - 1:
+                target_q = (r + self.args.gamma * q_next).detach()
+            else:
+                target_q = (r + self.args.gamma * q_next.unsqueeze(2).repeat(1,len(num[self.agent_id]),1)).detach()
 
         # the q loss
-        q_value = self.critic_network(o, u)
+        if self.agent_id == self.args.agent_block_num - 1:
+            q_value = self.critic_network(o, u)
+        else:
+            q_value = self.critic_network(o, u).unsqueeze(2).repeat(1,len(num[self.agent_id]),1)
         critic_loss = (target_q - q_value).pow(2).mean()
 
         # the actor loss
         # 重新选择联合动作中当前agent的动作，其他agent的动作不变
         new_house_actions = copy.copy(hou_actions)
         new_gov_actions = copy.copy(gov_actions)
-        if self.agent_id == self.args.n_agents - 1:
+        if self.agent_id == self.args.agent_block_num - 1:
             new_gov_actions = self.actor_network(global_obses)
         else:
-            this_o = torch.cat((global_obses, private_obses[:, self.agent_id]), dim=1)
-            new_house_actions[:, self.agent_id] = self.actor_network(this_o)
+            this_o = torch.cat((global_obses.unsqueeze(1).repeat(1, len(num[self.agent_id]),1), private_obses[:, num[self.agent_id]]), dim=-1)
+            new_house_actions[:, num[self.agent_id]] = self.actor_network(this_o)
         
         u = torch.cat((new_house_actions.view(self.args.batch_size, -1), new_gov_actions), dim=1)
         actor_loss = - self.critic_network(o, u).mean()
