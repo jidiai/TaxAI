@@ -7,9 +7,20 @@ from agents.models import mlp_net
 from agents.utils import select_actions, evaluate_actions
 from agents.log_path import make_logpath
 from datetime import datetime
+from env.evaluation import save_parameters
 import os
 import copy
 import wandb
+import pickle
+def load_params_from_file(filename):
+    with open(filename, 'rb') as f:
+        params = pickle.load(f)
+    return params
+
+def fetch_data(alg, i):
+    path = "/home/mqr/code/AI-TaxingPolicy/agents/models/independent_ppo/100/"+ alg+"/epoch_0_step_%d_100_gdp_parameters.pkl"%(i+1)
+    para = load_params_from_file(path)
+    return para['valid_action_dict']['Household']
 
 
 def save_args(path, args):
@@ -124,8 +135,6 @@ class ppo_agent:
         gov_rew = []
         house_rew = []
         epochs = []
-        wealth_stack = []
-        income_stack = []
 
         for update in range(self.args.n_epochs):
             mb_obs, mb_rewards, mb_actions, mb_dones, mb_values = [], [], [], [], []
@@ -142,8 +151,6 @@ class ppo_agent:
                 gov_action = self.action_wrapper(gov_actions)
                 house_actions = select_actions(house_pis)
                 input_actions = self.action_wrapper(house_actions)
-                # gov_action = np.array([0.263, 0.049, 0, 0, 0.189])
-                # gov_action = np.array([0.263, 0.049, 0.02, 0, 0.189, 0.4])
 
                 action = {self.envs.government.name: self.gov_action_max * (gov_action * 2 - 1),
                           self.envs.households.name: self.hou_action_max * (input_actions*2-1) }
@@ -186,7 +193,7 @@ class ppo_agent:
                 self._update_network(mb_obs, mb_actions, mb_returns, mb_advs, gov_mb_obs, gov_mb_actions, gov_mb_returns, gov_mb_advs)
             if update % self.args.display_interval == 0:
                 # start to do the evaluation
-                mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years, avg_wealth_stacked, avg_income_stacked = self._evaluate_agent()
+                mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years = self._evaluate_agent()
                 # store rewards and step
                 now_step = (update + 1) * self.args.epoch_length
                 gov_rew.append(mean_gov_rewards)
@@ -195,8 +202,8 @@ class ppo_agent:
                 np.savetxt(str(self.model_path) + "/house_reward.txt", house_rew)
                 epochs.append(now_step)
                 np.savetxt(str(self.model_path) + "/steps.txt", epochs)
-                np.savetxt(str(self.model_path) + "/wealth_stack.txt", wealth_stack)
-                np.savetxt(str(self.model_path) + "/income_stack.txt", income_stack)
+                # np.savetxt(str(self.model_path) + "/wealth_stack.txt", wealth_stack)
+                # np.savetxt(str(self.model_path) + "/income_stack.txt", income_stack)
 
                 # GDP + mean utility + wealth distribution + income distribution
                 wandb.log({"mean households utility": mean_house_rewards,
@@ -221,8 +228,9 @@ class ppo_agent:
         wandb.finish()
 
     def test(self):
-        self.households_net.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/bmfac/run105/house_actor.pt"))
-        mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years, avg_wealth_stacked, avg_income_stacked = self._evaluate_agent()
+        self.households_net.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/independent_ppo/1000/run2/house_net.pt"))
+        self.gov_net.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/independent_ppo/1000/run2/gov_net.pt"))
+        mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years = self._evaluate_agent()
         print("mean gov reward:", mean_gov_rewards)
 
 
@@ -285,7 +293,7 @@ class ppo_agent:
         return policy_loss, value_loss, ent_loss
     def _update_network(self, house_obs, house_actions, house_returns, house_advantages, gov_obs, gov_actions, gov_returns, gov_advantages):
         inds = np.arange(house_obs.shape[0])
-        nbatch_train = house_obs.shape[0] // self.args.batch_size
+        nbatch_train = self.args.batch_size
         for _ in range(self.args.update_epoch):
             np.random.shuffle(inds)
             for start in range(0, house_obs.shape[0], nbatch_train):
@@ -302,23 +310,26 @@ class ppo_agent:
     def _evaluate_agent(self):
         total_gov_reward = 0
         total_house_reward = 0
-        episode_mean_tax = []
-        episode_mean_wealth = []
-        episode_mean_post_income = []
-        episode_gdp = []
-        episode_income_gini = []
-        episode_wealth_gini = []
-        wealth_stacked_data = []
-        income_stacked_data = []
         total_steps = 0
-
-        for _ in range(self.args.eval_episodes):
+        mean_tax = 0
+        mean_wealth = 0
+        mean_post_income = 0
+        gdp = 0
+        income_gini = 0
+        wealth_gini = 0
+        for epoch_i in range(self.args.eval_episodes):
             global_obs, private_obs = self.eval_env.reset()
             episode_gov_reward = 0
             episode_mean_house_reward = 0
             step_count = 0
-            while True:
+            episode_mean_tax = []
+            episode_mean_wealth = []
+            episode_mean_post_income = []
+            episode_gdp = []
+            episode_income_gini = []
+            episode_wealth_gini = []
 
+            while True:
                 with torch.no_grad():
                     action = self._evaluate_get_action(global_obs, private_obs)
                     next_global_obs, next_private_obs, gov_reward, house_reward, done = self.eval_env.step(action)
@@ -332,10 +343,8 @@ class ppo_agent:
                 episode_gdp.append(self.eval_env.per_household_gdp)
                 episode_income_gini.append(self.eval_env.income_gini)
                 episode_wealth_gini.append(self.eval_env.wealth_gini)
-                # wealth_satcked_data:
-                wealth_stacked_data.append(self.eval_env.stacked_data(self.eval_env.households.at_next))
-                income_stacked_data.append(self.eval_env.stacked_data(self.eval_env.post_income))
-                # self.eval_env.render()
+                if step_count == 1 or step_count == 100 or step_count == 200 or step_count == 300:
+                    save_parameters(self.model_path, step_count, epoch_i, self.eval_env)
                 if done:
                     break
 
@@ -345,21 +354,24 @@ class ppo_agent:
             total_gov_reward += episode_gov_reward
             total_house_reward += episode_mean_house_reward
             total_steps += step_count
-
+            mean_tax += np.mean(episode_mean_tax)
+            mean_wealth += np.mean(episode_mean_wealth)
+            mean_post_income += np.mean(episode_mean_post_income)
+            gdp += np.mean(episode_gdp)
+            income_gini += np.mean(episode_income_gini)
+            wealth_gini += np.mean(episode_wealth_gini)
 
         avg_gov_reward = total_gov_reward / self.args.eval_episodes
         avg_house_reward = total_house_reward / self.args.eval_episodes
         mean_step = total_steps / self.args.eval_episodes
-        avg_mean_tax = np.mean(episode_mean_tax)
-        avg_mean_wealth = np.mean(episode_mean_wealth)
-        avg_mean_post_income = np.mean(episode_mean_post_income)
-        avg_gdp = np.mean(episode_gdp)
-        avg_income_gini = np.mean(episode_income_gini)
-        avg_wealth_gini = np.mean(episode_wealth_gini)
-        avg_wealth_stacked = np.mean(wealth_stacked_data, axis=0)
-        avg_income_stacked = np.mean(income_stacked_data, axis=0)
-        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, mean_step, avg_wealth_stacked, avg_income_stacked
-
+        avg_mean_tax = mean_tax / self.args.eval_episodes
+        avg_mean_wealth = mean_wealth / self.args.eval_episodes
+        avg_mean_post_income = mean_post_income / self.args.eval_episodes
+        avg_gdp = gdp / self.args.eval_episodes
+        avg_income_gini = income_gini / self.args.eval_episodes
+        avg_wealth_gini = wealth_gini / self.args.eval_episodes
+        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, \
+               avg_wealth_gini, mean_step
     def _evaluate_get_action(self, global_obs, private_obs):
         self.obs = self.obs_concate_numpy(global_obs, private_obs, update=False)
         gov_values, gov_pis = self.gov_net(self._get_tensor_inputs(global_obs))
@@ -373,4 +385,108 @@ class ppo_agent:
         action = {self.envs.government.name: self.gov_action_max * (gov_action * 2 - 1),
                   self.envs.households.name: self.hou_action_max * (input_actions * 2 - 1)}
         return action
+    # def _evaluate_agent(self):
+    #     np.random.seed(1)
+    #     total_gov_reward = 0
+    #     total_house_reward = 0
+    #     total_steps = 0
+    #     mean_tax = 0
+    #     mean_wealth = 0
+    #     mean_post_income = 0
+    #     gdp = 0
+    #     income_gini = 0
+    #     wealth_gini = 0
+    #     # for epoch_i in range(self.args.eval_episodes):
+    #     for epoch_i in range(1):
+    #         global_obs, private_obs = self.eval_env.reset()
+    #         episode_gov_reward = 0
+    #         episode_mean_house_reward = 0
+    #         step_count = 0
+    #         episode_mean_tax = []
+    #         episode_mean_wealth = []
+    #         episode_mean_post_income = []
+    #         episode_gdp = []
+    #         episode_income_gini = []
+    #         episode_wealth_gini = []
+    #
+    #         while True:
+    #             if step_count > 4:
+    #                 break
+    #             with torch.no_grad():
+    #                 # action = self._evaluate_get_action(global_obs, private_obs)
+    #                 action = self.test_evaluate_get_action(global_obs, private_obs, step_count)
+    #                 next_global_obs, next_private_obs, gov_reward, house_reward, done = self.eval_env.step(action)
+    #
+    #             step_count += 1
+    #             episode_gov_reward += gov_reward
+    #             episode_mean_house_reward += np.mean(house_reward)
+    #             episode_mean_tax.append(np.mean(self.eval_env.tax_array))
+    #             episode_mean_wealth.append(np.mean(self.eval_env.households.at_next))
+    #             episode_mean_post_income.append(np.mean(self.eval_env.post_income))
+    #             episode_gdp.append(self.eval_env.per_household_gdp)
+    #             episode_income_gini.append(self.eval_env.income_gini)
+    #             episode_wealth_gini.append(self.eval_env.wealth_gini)
+    #             if done:
+    #                 break
+    #             # if step_count == 1 or step_count == 10 or step_count == 30 or step_count == 300:
+    #             save_parameters(self.model_path, step_count, epoch_i, self.eval_env)
+    #
+    #
+    #             global_obs = next_global_obs
+    #             private_obs = next_private_obs
+    #
+    #         total_gov_reward += episode_gov_reward
+    #         total_house_reward += episode_mean_house_reward
+    #         total_steps += step_count
+    #         mean_tax += np.mean(episode_mean_tax)
+    #         mean_wealth += np.mean(episode_mean_wealth)
+    #         mean_post_income += np.mean(episode_mean_post_income)
+    #         gdp += np.mean(episode_gdp)
+    #         income_gini += np.mean(episode_income_gini)
+    #         wealth_gini += np.mean(episode_wealth_gini)
+    #
+    #     avg_gov_reward = total_gov_reward / self.args.eval_episodes
+    #     avg_house_reward = total_house_reward / self.args.eval_episodes
+    #     mean_step = total_steps / self.args.eval_episodes
+    #     avg_mean_tax = mean_tax / self.args.eval_episodes
+    #     avg_mean_wealth = mean_wealth / self.args.eval_episodes
+    #     avg_mean_post_income = mean_post_income / self.args.eval_episodes
+    #     avg_gdp = gdp / self.args.eval_episodes
+    #     avg_income_gini = income_gini / self.args.eval_episodes
+    #     avg_wealth_gini = wealth_gini / self.args.eval_episodes
+    #     return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, \
+    #            avg_wealth_gini, mean_step
+    #
+    #
+    #
+    # def test_evaluate_get_action(self, global_obs, private_obs, i):
+    #     self.obs = self.obs_concate_numpy(global_obs, private_obs, update=False)
+    #
+    #     house_values, house_pis = self.households_net(self._get_tensor_inputs(self.obs))
+    #     # select actions
+    #     # gov_action = np.random.random(self.envs.government.action_space.shape[0])
+    #     gov_actions = np.array([[0.99860359, 0.28571885, 0.49025352, 0.59911031, 0.189],
+    #                     [0.89874693, 0.716929,   0.49025352, 0.59911031, 0.189],
+    #                     [0.032421, 0.3282561 , 0.49025352, 0.59911031, 0.189],
+    #                     [0.010699,   0.55726823, 0.49025352 ,0.59911031, 0.189],
+    #                     [0.76172986, 0.24048432, 0.49025352, 0.59911031, 0.189]])
+    #     gov_action = gov_actions[i]
+    #     print(gov_action)
+    #
+    #     # ppo
+    #     # house_actions = select_actions(house_pis)
+    #     # input_actions = self.action_wrapper(house_actions)
+    #     # random
+    #     # temp = np.random.random((self.args.n_households, self.envs.households.action_space.shape[1]))
+    #     # input_actions = temp
+    #     # temp = np.zeros((self.args.n_households, self.envs.households.action_space.shape[1]))
+    #     # temp[:, 0] = 0.75
+    #     # temp[:, 1] = 2 / 3
+    #     # ga
+    #
+    #     input_actions = fetch_data("ga", i)
+    #
+    #     action = {self.envs.government.name: self.gov_action_max * (gov_action * 2 - 1),
+    #               self.envs.households.name: self.hou_action_max * input_actions}
+    #     return action
 

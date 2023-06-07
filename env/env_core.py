@@ -184,6 +184,7 @@ class economic_society:
         # gov_goal = "gini"
         if gov_goal == "gdp":
             return (self.per_household_gdp - self.old_per_gdp) / self.old_per_gdp
+            # return self.per_household_gdp
         elif gov_goal == "gini":
             return - (self.wealth_gini * self.income_gini)
         elif gov_goal == "social_welfare":
@@ -204,20 +205,6 @@ class economic_society:
             return False
 
     def reset(self, **custom_cfg):
-        # self.step_cnt = 0
-        # self.government.reset()
-        # self.households.reset()
-        # self.Kt_next = np.sum(self.households.at_next) * 0.5
-        # self.Bt_next = np.sum(self.households.at_next) * 0.5
-        # self.done = False
-        #
-        # self.Kt = copy.copy(self.Kt_next)
-        # self.workingHours = np.ones((self.households.n_households,1))/3
-        # self.ht = self.workinghours_wrapper(self.workingHours)
-        # self.MarketClear()
-        # self.GDP = self.generate_gdp()
-        # self.income = self.households.e * self.ht
-        '''new try'''
         self.step_cnt = 0
         self.government.reset()
         self.households.reset()
@@ -233,9 +220,7 @@ class economic_society:
         self.ht = self.workinghours_wrapper(self.workingHours)
         self.GDP = self.generate_gdp()
         self.income = self.households.e * self.ht
-        # print("reset:  hour_max:", self.hours_max)
 
-        # self.display_mode = False
         self.display_mode = False
         return self.get_obs()
 

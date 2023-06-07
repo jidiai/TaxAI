@@ -60,7 +60,7 @@ class rule_agent:
         wealth_stack = []
         income_stack = []
         
-        for epoch in range(1000):
+        for epoch in range(1):
 
 
             if epoch % self.args.display_interval == 0:
@@ -132,10 +132,10 @@ class rule_agent:
                 episode_gdp.append(self.eval_env.per_household_gdp)
                 episode_income_gini.append(self.eval_env.income_gini)
                 episode_wealth_gini.append(self.eval_env.wealth_gini)
+                if step_count == 1 or step_count == 100 or step_count == 200 or step_count == 300:
+                    save_parameters(self.model_path, step_count, epoch_i, self.eval_env)
                 if done:
                     break
-                if step_count == 1 or step_count == 10 or step_count == 30 or step_count == 300:
-                    save_parameters(self.model_path, step_count, epoch_i, self.eval_env)
             
                 global_obs = next_global_obs
                 private_obs = next_private_obs

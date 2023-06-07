@@ -1,0 +1,182 @@
+{
+    "os": "Linux-4.15.0-209-generic-x86_64-with-debian-buster-sid",
+    "python": "3.6.13",
+    "heartbeatAt": "2023-06-02T17:10:50.734627",
+    "startedAt": "2023-06-02T17:10:49.486617",
+    "docker": null,
+    "cuda": "10.0.130",
+    "args": [
+        "--device-num",
+        "0",
+        "--n_households",
+        "100",
+        "--alg",
+        "ppo",
+        "--task",
+        "gdp",
+        "--seed",
+        "2",
+        "--hidden_size",
+        "128",
+        "--q_lr",
+        "3e-4",
+        "--p_lr",
+        "3e-4",
+        "--batch_size",
+        "128"
+    ],
+    "state": "running",
+    "program": "main.py",
+    "codePath": "main.py",
+    "host": "zkyd",
+    "username": "mqr",
+    "executable": "/home/mqr/anaconda3/envs/ai_tax/bin/python",
+    "cpu_count": 12,
+    "cpu_count_logical": 24,
+    "cpu_freq": {
+        "current": 1200.518041666667,
+        "min": 1200.0,
+        "max": 4650.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 1200.009,
+            "min": 1200.0,
+            "max": 4700.0
+        },
+        {
+            "current": 1203.407,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1200.444,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1200.918,
+            "min": 1200.0,
+            "max": 4700.0
+        },
+        {
+            "current": 1200.445,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1199.962,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1200.478,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1200.12,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1200.474,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1199.999,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1200.557,
+            "min": 1200.0,
+            "max": 4800.0
+        },
+        {
+            "current": 1200.354,
+            "min": 1200.0,
+            "max": 4800.0
+        },
+        {
+            "current": 1199.941,
+            "min": 1200.0,
+            "max": 4700.0
+        },
+        {
+            "current": 1200.589,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1200.665,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1200.237,
+            "min": 1200.0,
+            "max": 4700.0
+        },
+        {
+            "current": 1200.177,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1199.209,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1200.599,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1199.716,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1200.186,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1201.032,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1200.623,
+            "min": 1200.0,
+            "max": 4800.0
+        },
+        {
+            "current": 1200.465,
+            "min": 1200.0,
+            "max": 4800.0
+        }
+    ],
+    "disk": {
+        "total": 260.938777923584,
+        "used": 94.84353256225586
+    },
+    "gpu": "NVIDIA GeForce RTX 2080 Ti",
+    "gpu_count": 2,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce RTX 2080 Ti",
+            "memory_total": 11554717696
+        },
+        {
+            "name": "NVIDIA GeForce RTX 2080 Ti",
+            "memory_total": 11553341440
+        }
+    ],
+    "memory": {
+        "total": 125.59713745117188
+    }
+}
