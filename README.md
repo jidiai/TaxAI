@@ -1,4 +1,4 @@
-# AI-TaxingPolicy
+# TaxAI
 
 The optimization of fiscal policies by governments to stimulate economic growth, ensure social equity and stability, and maximize social welfare has been a subject of significant interest. Simultaneously, individuals keenly observe government policies to optimize their own production and saving strategies. 
 
@@ -10,9 +10,6 @@ To simulate this problem, we propose a multi-agent reinforcement learning simula
 ```bash
 git clone https://github.com/jidiai/AI-TaxingPolicy.git
 ```
-
-todo : 未来改成 pip install ai_tax
-
 
 
 ## Requirements
@@ -41,31 +38,16 @@ todo : 未来改成 pip install ai_tax
 
 ```bash
 cd AI-TaxingPolicy
+python main.py --device-num 0 --n_households 1000 --alg "ppo" --task "gdp" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
 ```
 
-1. Free market policy:
+alg = {
+        Free market policy: "rule_based",
+        Independent PPO: "ppo",
+        MADDPG: "maddpg",
+        BMFAC: "bmfac" }
 
-   ```bash
-   python main.py --device-num 0 --n_households 100 --alg "rule_based"
-   ```
-
-2. Independent PPO:
-
-   ```bash
-   python main.py --device-num 0 --n_households 100 --alg "ppo"
-   ```
-
-3. MAPPO:
-
-   ```bash
-   python main.py --device-num 0 --n_households 100 --alg "mappo"
-   ```
-
-4. BMFAC:
-
-   ```bash
-   python main.py --device-num 0 --n_households 100 --alg "bmfac"
-   ```
+task = {max GDP:"gdp", min Gini: "gini", max social welfare: "social_welfare"}
 
    "device-num" means GPU index
 
@@ -108,23 +90,7 @@ env.close()
 
 ```
 
+## Acknowledgement
+[Reinforcement-learning-algorithms](https://github.com/TianhongDai/reinforcement-learning-algorithms)
 
-
-## Citation
-
-If you use ai_tax for published research, please cite:
-
-==todo修改成我们的论文链接== 
-
-```bibtex
-@inproceedings{todorov2012mujoco,
-  title={MuJoCo: A physics engine for model-based control},
-  author={Todorov, Emanuel and Erez, Tom and Tassa, Yuval},
-  booktitle={2012 IEEE/RSJ International Conference on Intelligent Robots and Systems},
-  pages={5026--5033},
-  year={2012},
-  organization={IEEE},
-  doi={10.1109/IROS.2012.6386109}
-}
-```
-
+[MADDPG](https://github.com/starry-sky6688/MADDPG)
