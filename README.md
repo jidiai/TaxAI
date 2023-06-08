@@ -8,7 +8,7 @@ To simulate this problem, we propose a multi-agent reinforcement learning simula
 ## Installation
 
 ```bash
-git clone https://github.com/jidiai/AI-TaxingPolicy.git
+git clone https://github.com/jidiai/TaxAI.git
 ```
 
 
@@ -37,7 +37,7 @@ git clone https://github.com/jidiai/AI-TaxingPolicy.git
 ## Run
 
 ```bash
-cd AI-TaxingPolicy
+cd TaxAI
 python main.py --device-num 0 --n_households 1000 --alg "ppo" --task "gdp" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
 ```
 
