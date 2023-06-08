@@ -17,13 +17,13 @@ git clone https://github.com/jidiai/AI-TaxingPolicy.git
 1. Build a Python virtual environment
 
    ```bash
-   conda create -n ai_tax python=3.6
+   conda create -n TaxAI python=3.6
    ```
 
 2. Activate the virtual environment
 
    ```bash
-   conda activate ai_tax
+   conda activate TaxAI
    ```
 
 3. Install the requirements package
@@ -55,7 +55,7 @@ task = {max GDP:"gdp", min Gini: "gini", max social welfare: "social_welfare"}
 
 ## Env API
 
-The ai_tax API's API models environments as simple Python `env` classes. Creating environment instances and interacting with them is very simple- here's an example using the "gdp" environment:
+The TaxAI API's API models environments as simple Python `env` classes. Creating environment instances and interacting with them is very simple- here's an example using the "gdp" environment:
 you can change government task in './cfg/default.yaml'.
 ```bash
 gov_task: "gdp"  # choices: {"gdp", "gini", "social_welfare", "gdp_gini"}
