@@ -8,7 +8,7 @@ To simulate this problem, we propose a multi-agent reinforcement learning simula
 ## Installation
 
 ```bash
-git clone https://github.com/jidiai/AI-TaxingPolicy.git
+git clone https://github.com/jidiai/TaxAI.git
 ```
 
 
@@ -17,13 +17,13 @@ git clone https://github.com/jidiai/AI-TaxingPolicy.git
 1. Build a Python virtual environment
 
    ```bash
-   conda create -n ai_tax python=3.6
+   conda create -n TaxAI python=3.6
    ```
 
 2. Activate the virtual environment
 
    ```bash
-   conda activate ai_tax
+   conda activate TaxAI
    ```
 
 3. Install the requirements package
@@ -37,7 +37,7 @@ git clone https://github.com/jidiai/AI-TaxingPolicy.git
 ## Run
 
 ```bash
-cd AI-TaxingPolicy
+cd TaxAI
 python main.py --device-num 0 --n_households 1000 --alg "ppo" --task "gdp" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
 ```
 
@@ -55,7 +55,7 @@ task = {max GDP:"gdp", min Gini: "gini", max social welfare: "social_welfare"}
 
 ## Env API
 
-The ai_tax API's API models environments as simple Python `env` classes. Creating environment instances and interacting with them is very simple- here's an example using the "gdp" environment:
+The TaxAI API's API models environments as simple Python `env` classes. Creating environment instances and interacting with them is very simple- here's an example using the "gdp" environment:
 you can change government task in './cfg/default.yaml'.
 ```bash
 gov_task: "gdp"  # choices: {"gdp", "gini", "social_welfare", "gdp_gini"}
