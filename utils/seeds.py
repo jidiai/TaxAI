@@ -4,17 +4,17 @@ import torch
 import os
 
 # set random seeds for the pytorch, numpy and random
-def set_seeds(args, rank=0):
+def set_seeds(seed,cuda=False):
     # set seeds for the numpy
-    np.random.seed(args.seed + rank)
+    np.random.seed(seed)
     # set seeds for the random.random
-    random.seed(args.seed + rank)
-    os.environ['PYTHONHASHSEED'] = str(args.seed + rank)
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
     # set seeds for the pytorch
-    torch.manual_seed(args.seed + rank)
-    if args.cuda:
-        torch.cuda.manual_seed(args.seed + rank)
-        torch.cuda.manual_seed_all(args.seed + rank)
+    torch.manual_seed(seed)
+    if cuda:
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 

@@ -1,0 +1,69 @@
+expr_name: test
+log_dir: ./logs             #log directory
+seed: 0
+device_num: 1
+
+Environment:
+  Entities:
+    - entity_name: 'government'
+      entity_args:
+        n: 1            #number of government
+        tau: 0.263
+        xi: 0.049
+        tau_a: 0
+        xi_a: 0
+        G: 0
+        action_shape: 5
+
+    - entity_name: 'household'
+      entity_args:
+        n: 500
+        consumption_range: 1
+        working_hours_range: 24
+        CRRA: 1
+        IFE: 2
+        eta: 0
+        lump_sum_transfer: 0.167
+        action_shape: 2
+        WageRate: 1
+        RentRate: 0.04
+
+  env_core:
+    possible_agents: ['government', 'households']
+    env_args:
+      alpha: 1/3
+      WageRate: 1
+      RentRate: 0.04
+      episode_years: 100
+      year_per_step: 1
+
+
+Trainer:
+  n_households: 500
+  log_std_min:  -20
+  log_std_max:  2
+  hidden_size:  256
+  cuda: True
+  q_lr: 3e-4
+  p_lr: 3e-4
+  buffer_size:  1e6
+  env_name: 'wealth_distribution'
+  init_exploration_policy:  1e3
+  n_epochs: 3000
+  epoch_length: 1000
+  update_cycles:  10
+  target_update_interval: 1
+  display_interval: 1
+  batch_size: 64
+  gamma: 0.975
+  tau:  5e-3
+  eval_episodes: 10
+  init_exploration_steps: 1000
+
+
+
+
+
+
+
+

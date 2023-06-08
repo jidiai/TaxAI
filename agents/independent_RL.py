@@ -1,21 +1,26 @@
-import copy
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch import optim
+
 import os,sys
-import wandb
 sys.path.append(os.path.abspath('../..'))
-
-from agents.models import SharedAgent, SharedCritic, Actor, Critic
-from agents.log_path import make_logpath
-from utils.experience_replay import replay_buffer
-from agents.utils import get_action_info
+from agents.models import Actor, Critic
 from datetime import datetime
-from tensorboardX import SummaryWriter
+from agents.log_path import make_logpath
+# from mpi4py import MPI
+from agents.utils import get_action_info
+from utils.experience_replay import replay_buffer
+from agents.utils import ounoise
+import copy
+import gym
+import wandb
 
-torch.autograd.set_detect_anomaly(True)
+"""
+ddpg algorithms - revised baseline version
 
+support MPI training
+
+"""
 def save_args(path, args):
     argsDict = args.__dict__
     with open(str(path) + '/setting.txt', 'w') as f:
@@ -25,32 +30,28 @@ def save_args(path, args):
         f.writelines('------------------- end -------------------')
 
 
-class agent:
+class independent_agent:
     def __init__(self, envs, args):
         self.envs = envs
         self.args = args
         self.eval_env = copy.copy(envs)
         # start to build the network.
-        gov_obs_dim = self.envs.government.observation_space.shape[0]
-        gov_action_dim = self.envs.government.action_space.shape[0]
-        house_obs_dim = self.envs.households.observation_space.shape[0] + gov_action_dim
-        house_action_dim = self.envs.households.action_space.shape[0]
+        self.gov_actor = Actor(self.envs.government.observation_space.shape[0],
+                               self.envs.government.action_space.shape[0], self.args.hidden_size, \
+                               self.args.log_std_min, self.args.log_std_max)
+        self.house_actor = Actor(self.envs.households.observation_space.shape[0],
+                                       self.envs.households.action_space.shape[0], self.args.hidden_size,
+                                       self.args.log_std_min, self.args.log_std_max)
 
-        self.gov_actor = Actor(gov_obs_dim, gov_action_dim, self.args.hidden_size, self.args.log_std_min, self.args.log_std_max)
-        self.house_actor = SharedAgent(house_obs_dim, house_action_dim, self.args.n_households, self.args.log_std_min, self.args.log_std_max)
-        self.gov_critic = Critic(gov_obs_dim, self.args.hidden_size, gov_action_dim)
-        self.target_gov_qf = copy.deepcopy(self.gov_critic)
-        self.house_critic = SharedCritic(house_obs_dim, house_action_dim, self.args.hidden_size, self.args.n_households)
-        self.target_house_qf = copy.deepcopy(self.house_critic)
+        self.gov_critic = Critic(self.envs.government.observation_space.shape[0], self.args.hidden_size,
+                                 self.envs.government.action_space.shape[0])
+        self.house_critic = Critic(self.envs.households.observation_space.shape[0], self.args.hidden_size,
+                                   self.envs.households.action_space.shape[0])
 
-        # if use the cuda...
-        if self.args.cuda:
-            self.gov_actor.cuda()
-            self.house_actor.cuda()
-            self.gov_critic.cuda()
-            self.house_critic.cuda()
-            self.target_gov_qf.cuda()
-            self.target_house_qf.cuda()
+        self.gov_actor_target_net = copy.deepcopy(self.gov_actor)
+        self.house_actor_target_net = copy.deepcopy(self.house_actor)
+        self.gov_critic_target_net = copy.deepcopy(self.gov_critic)
+        self.house_critic_target_net = copy.deepcopy(self.house_critic)
 
         # define the optimizer...
         self.gov_critic_optim = torch.optim.Adam(self.gov_critic.parameters(), lr=self.args.q_lr)
@@ -66,40 +67,70 @@ class agent:
         self.gov_action_max = self.envs.government.action_space.high[0]
         self.hou_action_max = self.envs.households.action_space.high[0]
 
-        self.model_path, _ = make_logpath(algo="baseline")
+        # if use the cuda...
+        if self.args.cuda:
+            self.gov_actor.cuda()
+            self.house_actor.cuda()
+            self.gov_critic.cuda()
+            self.house_critic.cuda()
+            self.gov_actor_target_net.cuda()
+            self.house_actor_target_net.cuda()
+            self.gov_critic_target_net.cuda()
+            self.house_critic_target_net.cuda()
+
+        # create the noise generator
+        self.gov_noise_generator = ounoise(std=0.2, action_dim=self.envs.government.action_dim)
+        self.house_noise_generator = ounoise(std=0.2, action_dim=self.envs.households.action_dim)
+        self.model_path, _ = make_logpath(algo="independent")
         save_args(path=self.model_path, args=self.args)
         wandb.init(
             config=self.args,
             project="AI_TaxingPolicy",
             entity="ai_tax",
-            name=self.model_path.parent.name + "-"+ self.model_path.name +'  n='+ str(self.args.n_households),
+            name=self.model_path.parent.name + "-"+ self.model_path.name + '  n=' + str(self.args.n_households),
             dir=str(self.model_path),
             job_type="training",
             reinit=True
         )
 
+
+    def _get_tensor_inputs(self, obs):
+        obs_tensor = torch.tensor(obs, dtype=torch.float32, device='cuda' if self.args.cuda else 'cpu').unsqueeze(0)
+        return obs_tensor
+
+    def obs_concate(self, global_obs, private_obs, update=True):
+        if update == True:
+            global_obs = global_obs.unsqueeze(1)
+        n_global_obs = global_obs.repeat(1, self.args.n_households, 1)
+        return torch.cat([n_global_obs, private_obs], dim=-1).flatten(0,1)
+
+
+
     def learn(self):
-        # for loop
+        """
+        the learning part
+
+        """
         global_timesteps = 0
-        # before the official training, do the initial exploration to add episodes into the replay buffer
-        self._initial_exploration(exploration_policy=self.args.init_exploration_policy)
-        # reset the environment
+        self.gov_noise_generator.reset()
+        self.house_noise_generator.reset()
         global_obs, private_obs = self.envs.reset()
         gov_rew = []
         house_rew = []
         epochs = []
+
         for epoch in range(self.args.n_epochs):
-            # for each epoch, it will reset the environment
             for t in range(self.args.epoch_length):
                 # start to collect samples
                 global_obs_tensor = self._get_tensor_inputs(global_obs)
                 private_obs_tensor = self._get_tensor_inputs(private_obs)
                 gov_pi = self.gov_actor(global_obs_tensor)
                 gov_action = get_action_info(gov_pi, cuda=self.args.cuda).select_actions(reparameterize=False)
-                hou_pi = self.house_actor(global_obs_tensor, private_obs_tensor, gov_action)
+                hou_pi = self.house_actor(self.obs_concate(global_obs_tensor, private_obs_tensor, update=False))
                 hou_action = get_action_info(hou_pi, cuda=self.args.cuda).select_actions(reparameterize=False)
                 gov_action = gov_action.cpu().numpy()[0]
-                hou_action = hou_action.cpu().numpy()[0]
+                hou_action = hou_action.cpu().numpy()
+                gov_action, hou_action = self.add_noise(gov_action, hou_action)
                 action = {self.envs.government.name: gov_action,
                           self.envs.households.name: hou_action}
                 next_global_obs, next_private_obs, gov_reward, house_reward, done = self.envs.step(action)
@@ -113,18 +144,23 @@ class agent:
                 if done:
                     # if done, reset the environment
                     global_obs, private_obs = self.envs.reset()
-            # after collect the samples, start to update the network
+                    self.gov_noise_generator.reset()
+                    self.house_noise_generator.reset()
+                # after collect the samples, start to update the network
             for _ in range(self.args.update_cycles):
                 gov_actor_loss, gov_critic_loss, house_actor_loss, house_critic_loss = self._update_network()
                 # update the target network
                 if global_timesteps % self.args.target_update_interval == 0:
-                    self._update_target_network(self.target_gov_qf, self.gov_critic)
-                    self._update_target_network(self.target_house_qf, self.house_critic)
+                    self._update_target_network(self.gov_critic_target_net, self.gov_critic)
+                    self._update_target_network(self.house_critic_target_net, self.house_critic)
+                    self._update_target_network(self.gov_actor_target_net, self.gov_actor)
+                    self._update_target_network(self.house_actor_target_net, self.house_actor)
+
                 global_timesteps += 1
-            # print the log information
+                # print the log information
             if epoch % self.args.display_interval == 0:
                 # start to do the evaluation
-                mean_gov_rewards, mean_house_rewards = self._evaluate_agent()
+                mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income = self._evaluate_agent()
                 # store rewards and step
                 now_step = (epoch + 1) * self.args.epoch_length
                 gov_rew.append(mean_gov_rewards)
@@ -140,63 +176,40 @@ class agent:
                            "wealth gini": self.envs.wealth_gini,
                            "income gini": self.envs.income_gini,
                            "GDP": self.envs.GDP,
+                           "tax per households": avg_mean_tax,
+                           "post income per households": avg_mean_post_income,
+                           "wealth per households": avg_mean_wealth,
                            "government actor loss": gov_actor_loss,
                            "government critic loss": gov_critic_loss,
                            "households actor loss": house_actor_loss,
                            "households critic loss": house_critic_loss,
                            "steps": now_step})
 
-
                 print(
                     '[{}] Epoch: {} / {}, Frames: {}, gov_Rewards: {:.3f}, house_Rewards: {:.3f}, gov_actor_loss: {:.3f}, gov_critic_loss: {:.3f}, house_actor_loss: {:.3f}, house_critic_loss: {:.3f}'.format(
-                        datetime.now(), epoch, self.args.n_epochs, (epoch + 1) * self.args.epoch_length, mean_gov_rewards, mean_house_rewards, gov_actor_loss, gov_critic_loss, house_actor_loss, house_critic_loss))
+                        datetime.now(), epoch, self.args.n_epochs, (epoch + 1) * self.args.epoch_length,
+                        mean_gov_rewards, mean_house_rewards, gov_actor_loss, gov_critic_loss, house_actor_loss,
+                        house_critic_loss))
                 # save models
                 torch.save(self.gov_actor.state_dict(), str(self.model_path) + '/gov_actor.pt')
                 torch.save(self.house_actor.state_dict(), str(self.model_path) + '/house_actor.pt')
 
         wandb.finish()
 
-    def test(self):
-        self.gov_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/wealth_distribution/baseline/run56/gov_actor.pt"))
-        self.house_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/wealth_distribution/baseline/run56/house_actor.pt"))
-        rew = self._evaluate_agent()
-        return rew
+    # update the target network
+    def _update_target_network(self, target, source):
+        for target_param, param in zip(target.parameters(), source.parameters()):
+            target_param.data.copy_(self.args.tau * param.data + (1 - self.args.tau) * target_param.data)
 
-    # do the initial exploration by using the uniform policy
-    def _initial_exploration(self, exploration_policy='gaussian'):
-        # get the action information of the environment
-        global_obs, private_obs = self.envs.reset()
-        for _ in range(self.args.init_exploration_steps):
-            if exploration_policy == 'uniform':
-                raise NotImplementedError
-            elif exploration_policy == 'gaussian':
-                with torch.no_grad():
-                    global_obs_tensor = self._get_tensor_inputs(global_obs)
-                    private_obs_tensor = self._get_tensor_inputs(private_obs)
-                    gov_pi = self.gov_actor(global_obs_tensor)
-                    gov_action = get_action_info(gov_pi, cuda=self.args.cuda).select_actions(reparameterize=False)
-                    hou_pi = self.house_actor(global_obs_tensor, private_obs_tensor, gov_action)
-                    hou_action = get_action_info(hou_pi, cuda=self.args.cuda).select_actions(reparameterize=False)
-                    gov_action = gov_action.cpu().numpy()[0]
-                    hou_action = hou_action.cpu().numpy()[0]
-                    action = {self.envs.government.name: self.gov_action_max * gov_action,
-                              self.envs.households.name: self.hou_action_max * hou_action}
-                    next_global_obs, next_private_obs, gov_reward, house_reward, done = self.envs.step(action)
+    # this function will choose action for the agent and do the exploration
+    def add_noise(self, gov_action, house_action):
+        gov_action = gov_action + self.gov_noise_generator.noise()
+        house_action = house_action + self.house_noise_generator.noise()
+        gov_action = np.clip(gov_action, -1, 1)
+        house_action = np.clip(house_action, -1, 1)
+        return gov_action, house_action
 
-                # store the episodes
-                self.buffer.add(global_obs, private_obs, gov_action, hou_action,  gov_reward, house_reward, next_global_obs, next_private_obs, float(done))
-
-                global_obs = next_global_obs
-                private_obs = next_private_obs
-                if done:
-                    # if done, reset the environment
-                    global_obs, private_obs = self.envs.reset()
-        print("Initial exploration has been finished!")
-
-    def _get_tensor_inputs(self, obs):
-        obs_tensor = torch.tensor(obs, dtype=torch.float32, device='cuda' if self.args.cuda else 'cpu').unsqueeze(0)
-        return obs_tensor
-
+    # update the network
     def _update_network(self):
         # smaple batch of samples from the replay buffer
         global_obses, private_obses, gov_actions, hou_actions, gov_rewards,\
@@ -212,35 +225,30 @@ class agent:
         next_private_obses = torch.tensor(next_private_obses, dtype=torch.float32, device='cuda' if self.args.cuda else 'cpu')
         inverse_dones = torch.tensor(1 - dones, dtype=torch.float32,
                                      device='cuda' if self.args.cuda else 'cpu').unsqueeze(-1)
-        # todo update government critic
-        next_gov_pi = self.gov_actor(next_global_obses)
-        next_gov_action, _ = get_action_info(next_gov_pi, cuda=self.args.cuda).select_actions(reparameterize=True)
-        gov_td_target = gov_rewards + inverse_dones * self.args.gamma * self.target_gov_qf(next_global_obses, next_gov_action)
+        n_inverse_dones = inverse_dones.repeat(self.args.n_households, 1)
+        with torch.no_grad():
+            next_gov_pi = self.gov_actor(next_global_obses)
+            next_gov_action, _ = get_action_info(next_gov_pi, cuda=self.args.cuda).select_actions(reparameterize=True)
+            gov_td_target = gov_rewards + inverse_dones * self.args.gamma * self.gov_critic_target_net(next_global_obses, next_gov_action)
+            next_house_pi = self.house_actor(self.obs_concate(next_global_obses, next_private_obses))
+            next_house_action, _ = get_action_info(next_house_pi, cuda=self.args.cuda).select_actions(reparameterize=True)
+            house_td_target = house_rewards.flatten(0,1) + n_inverse_dones * self.args.gamma * self.house_critic_target_net(
+                self.obs_concate(next_global_obses, next_private_obses), next_house_action)
+
         gov_q_value = self.gov_critic(global_obses, gov_actions)
-        gov_td_delta = gov_td_target - gov_q_value
         gov_critic_loss = torch.mean(F.mse_loss(gov_q_value, gov_td_target.detach()))
-        # todo households data reshape
-        next_hou_pi = self.house_actor(next_global_obses, next_private_obses, next_gov_action, update=True)
-        next_hou_action, _ = get_action_info(next_hou_pi, cuda=self.args.cuda).select_actions(reparameterize=True)
-        n_inverse_dones = inverse_dones.unsqueeze(1).repeat(1, self.args.n_households, 1)
-        house_td_target = house_rewards + n_inverse_dones * self.args.gamma * self.target_house_qf(next_global_obses, next_private_obses, next_gov_action, next_hou_action)
-        house_q_value = self.house_critic(global_obses, private_obses, gov_actions, hou_actions)
-        house_td_delta = house_td_target - house_q_value
+
+        house_q_value = self.house_critic(self.obs_concate(global_obses, private_obses), hou_actions.flatten(0,1))
         house_critic_loss = torch.mean(F.mse_loss(house_q_value, house_td_target.detach()))
-
-        # todo government actor
+        # the actor loss
         gov_pis = self.gov_actor(global_obses)
-        gov_actions_info = get_action_info(gov_pis, cuda=self.args.cuda)
-        gov_actions_, gov_pre_tanh_value = gov_actions_info.select_actions(reparameterize=True)
-        gov_log_prob = gov_actions_info.get_log_prob(gov_actions_, gov_pre_tanh_value)
-        gov_actor_loss = torch.mean(-gov_log_prob * gov_td_delta.detach())
+        gov_actions_, _ = get_action_info(gov_pis, cuda=self.args.cuda).select_actions(reparameterize=True)
+        gov_actor_loss = -self.gov_critic(global_obses, gov_actions_).mean()
 
-        # todo households actor
-        house_pis = self.house_actor(global_obses, private_obses, gov_actions, update=True)
-        house_actions_info = get_action_info(house_pis, cuda=self.args.cuda)
-        house_actions_, house_pre_tanh_value = house_actions_info.select_actions(reparameterize=True)
-        house_log_prob = house_actions_info.get_log_prob(house_actions_, house_pre_tanh_value)/self.args.n_households
-        house_actor_loss = torch.mean(-house_log_prob.sum(2) * house_td_delta.detach().mean(1))
+        house_pis = self.house_actor(self.obs_concate(global_obses, private_obses))
+        house_actions_, _ = get_action_info(house_pis, cuda=self.args.cuda).select_actions(reparameterize=True)
+        house_actor_loss = -self.house_critic(self.obs_concate(global_obses, private_obses), house_actions_).mean()
+
 
         self.gov_actor_optim.zero_grad()
         self.gov_critic_optim.zero_grad()
@@ -257,35 +265,42 @@ class agent:
 
         return gov_actor_loss.item(), gov_critic_loss.item(), house_actor_loss.item(), house_critic_loss.item()
 
-    # update the target network
-    def _update_target_network(self, target, source):
-        for target_param, param in zip(target.parameters(), source.parameters()):
-            target_param.data.copy_(self.args.tau * param.data + (1 - self.args.tau) * target_param.data)
 
-    # evaluate the agent
     def _evaluate_agent(self):
         total_gov_reward = 0
         total_house_reward = 0
+        total_mean_tax = 0
+        total_mean_wealth = 0
+        total_mean_post_income = 0
         for _ in range(self.args.eval_episodes):
             global_obs, private_obs = self.eval_env.reset()
             episode_gov_reward = 0
             episode_mean_house_reward = 0
+            episode_mean_tax = 0
+            episode_mean_wealth = 0
+            episode_mean_post_income = 0
+
             while True:
                 with torch.no_grad():
+                    # start to collect samples
                     global_obs_tensor = self._get_tensor_inputs(global_obs)
                     private_obs_tensor = self._get_tensor_inputs(private_obs)
                     gov_pi = self.gov_actor(global_obs_tensor)
-                    gov_action = get_action_info(gov_pi, cuda=self.args.cuda).select_actions(exploration=False, reparameterize=False)
-                    hou_pi = self.house_actor(global_obs_tensor, private_obs_tensor, gov_action)
-                    hou_action = get_action_info(hou_pi, cuda=self.args.cuda).select_actions(exploration=False, reparameterize=False)
-                    gov_action = gov_action.detach().cpu().numpy()[0]
-                    hou_action = hou_action.detach().cpu().numpy()[0]
-                    action = {self.envs.government.name: self.gov_action_max * gov_action,
-                              self.envs.households.name: self.hou_action_max * hou_action}
-                    next_global_obs, next_private_obs, gov_reward, house_reward, done = self.envs.step(action)
+                    gov_action = get_action_info(gov_pi, cuda=self.args.cuda).select_actions(reparameterize=False)
+                    hou_pi = self.house_actor(self.obs_concate(global_obs_tensor, private_obs_tensor, update=False))
+                    hou_action = get_action_info(hou_pi, cuda=self.args.cuda).select_actions(reparameterize=False)
+                    gov_action = gov_action.cpu().numpy()[0]
+                    hou_action = hou_action.cpu().numpy()
+                    gov_action, hou_action = self.add_noise(gov_action, hou_action)
+                    action = {self.eval_env.government.name: gov_action,
+                              self.eval_env.households.name: hou_action}
+                    next_global_obs, next_private_obs, gov_reward, house_reward, done = self.eval_env.step(action)
 
                 episode_gov_reward += gov_reward
                 episode_mean_house_reward += np.mean(house_reward)
+                episode_mean_tax += np.mean(self.eval_env.tax_array)
+                episode_mean_wealth += np.mean(self.eval_env.households.at_next)
+                episode_mean_post_income += np.mean(self.eval_env.post_income)
                 if done:
                     break
                 global_obs = next_global_obs
@@ -293,6 +308,16 @@ class agent:
 
             total_gov_reward += episode_gov_reward
             total_house_reward += episode_mean_house_reward
+            total_mean_tax += episode_mean_tax
+            total_mean_wealth += episode_mean_wealth
+            total_mean_post_income += episode_mean_post_income
+
         avg_gov_reward = total_gov_reward / self.args.eval_episodes
         avg_house_reward = total_house_reward / self.args.eval_episodes
-        return avg_gov_reward, avg_house_reward
+        avg_mean_tax = total_mean_tax / self.args.eval_episodes
+        avg_mean_wealth = total_mean_wealth / self.args.eval_episodes
+        avg_mean_post_income = total_mean_post_income / self.args.eval_episodes
+        return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income
+
+
+
