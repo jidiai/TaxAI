@@ -17,15 +17,6 @@ from env.evaluation import save_parameters
 
 torch.autograd.set_detect_anomaly(True)
 
-import pickle
-# def load_params_from_file(filename):
-#     with open(filename, 'rb') as f:
-#         params = pickle.load(f)
-#     return params
-# def fetch_data(alg, i):
-#     path = "/home/mqr/code/AI-TaxingPolicy/agents/models/independent_ppo/100/"+ alg+"/epoch_0_step_%d_100_gdp_parameters.pkl"%(i+1)
-#     para = load_params_from_file(path)
-#     return para['valid_action_dict']['Household']
 
 def save_args(path, args):
     argsDict = args.__dict__
@@ -128,6 +119,14 @@ class BMFAC_agent:
         bot50_action = actions.gather(1, bottom50_wealth_index.unsqueeze(2).expand(-1, -1, self.envs.households.action_space.shape[1]))
 
         return torch.cat((torch.mean(top10_action, dim=1), torch.mean(bot50_action, dim=1)), 1)
+    def observation_wrapper(self, global_obs, private_obs):
+        # global
+        global_obs[0] /= 1e7
+        global_obs[1] /= 1e5
+        global_obs[3] /= 1e5
+        global_obs[4] /= 1e5
+        private_obs[:, 1] /= 1e5
+        return global_obs, private_obs
 
     def learn(self):
         update_freq = self.args.update_freq
@@ -138,12 +137,18 @@ class BMFAC_agent:
         self._initial_exploration(exploration_policy=self.args.init_exploration_policy)
         # reset the environment
         global_obs, private_obs = self.envs.reset()
-        past_mean_house_action = self.multiple_households_mean_action()
+        global_obs, private_obs = self.observation_wrapper(global_obs, private_obs)
+        # past_mean_house_action = self.multiple_households_mean_action()
         gov_rew = []
         house_rew = []
         epochs = []
-        wealth_stack = []
-        income_stack = []
+        years_list = []
+        GDP_list = []
+        wealth_gini_list = []
+        income_gini_list = []
+        tax_list = []
+        post_wealth_list = []
+        post_income_list = []
         agent_list = ["households", "government"]
         update_index = 0
         max_sw = 0
@@ -151,9 +156,10 @@ class BMFAC_agent:
         # for epoch in range(1):
         for epoch in range(self.args.n_epochs):
             self.save_true = False
-            if (epoch // update_freq) % 2 == 0 and epoch > initial_train:
+            if epoch % update_freq == 0:
                 update_index = 1 - update_index
             update_agent = agent_list[update_index]
+            print("update_agent:", update_agent)
 
             # for each epoch, it will reset the environment
             for t in range(self.args.epoch_length):
@@ -167,20 +173,11 @@ class BMFAC_agent:
                 gov_action = gov_action.cpu().numpy()[0]
                 hou_action = hou_action.cpu().numpy()[0]
 
-                # if epoch < initial_train:
-                #     self.fix_gov = True
-                #     # gov_action = np.array([0.1/0.5, 0.0/0.05, 0, 0, 0.1]) + np.random.normal(0,0.1, size=(5,))
-                #     temp = np.zeros((self.args.n_households, 2))
-                #     temp[:, 0] = 0.7
-                #     temp[:, 1] = 1 / 3
-                #     hou_action = temp * 2 - 1
-                # else:
-                #     self.fix_gov = False
-
                 past_mean_house_action = self.multiple_households_mean_action(hou_action)[0]
                 action = {self.envs.government.name: gov_action,
                           self.envs.households.name: hou_action}
                 next_global_obs, next_private_obs, gov_reward, house_reward, done = self.envs.step(action)
+                next_global_obs, next_private_obs = self.observation_wrapper(next_global_obs, next_private_obs)
 
                 # store the episodes
                 self.buffer.mf_add(global_obs, private_obs, gov_action, hou_action, past_mean_house_action, gov_reward, house_reward,
@@ -191,8 +188,7 @@ class BMFAC_agent:
                 if done:
                     # if done, reset the environment
                     global_obs, private_obs = self.envs.reset()
-                # after collect the samples, start to update the network
-                # for _ in range(self.args.update_cycles):
+                    global_obs, private_obs = self.observation_wrapper(global_obs, private_obs)
                 # todo 改成每次都更新
                 if t % 1 == 0:
                     gov_actor_loss, gov_critic_loss, house_actor_loss, house_critic_loss = self._update_network(update_agent=update_agent)
@@ -213,6 +209,20 @@ class BMFAC_agent:
                 np.savetxt(str(self.model_path) + "/house_reward.txt", house_rew)
                 epochs.append(now_step)
                 np.savetxt(str(self.model_path) + "/steps.txt", epochs)
+                years_list.append(years)
+                GDP_list.append(avg_gdp)
+                wealth_gini_list.append(avg_wealth_gini)
+                income_gini_list.append(avg_income_gini)
+                tax_list.append(avg_mean_tax)
+                post_wealth_list.append(avg_mean_wealth)
+                post_income_list.append(avg_mean_post_income)
+                np.savetxt(str(self.model_path) + "/years.txt", years_list)
+                np.savetxt(str(self.model_path) + "/gdp.txt", GDP_list)
+                np.savetxt(str(self.model_path) + "/wealth_gini.txt", wealth_gini_list)
+                np.savetxt(str(self.model_path) + "/income_gini.txt", income_gini_list)
+                np.savetxt(str(self.model_path) + "/tax.txt", tax_list)
+                np.savetxt(str(self.model_path) + "/post_wealth.txt", post_wealth_list)
+                np.savetxt(str(self.model_path) + "/post_income.txt", post_income_list)
 
 
                 if self.wandb:
@@ -248,7 +258,7 @@ class BMFAC_agent:
     def test(self):
         # self.gov_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/bmfac/run105/gov_actor.pt"))
         # self.house_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/bmfac/run105/house_actor.pt"))
-        self.house_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/bmfac/100/run23/house_actor.pt"))
+        self.house_actor.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/bmfac/100/run2/house_actor.pt"))
         mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years = self._evaluate_agent()
         print("mean gov reward:", mean_gov_rewards)
 
@@ -257,6 +267,7 @@ class BMFAC_agent:
     def _initial_exploration(self, exploration_policy='gaussian'):
         # get the action information of the environment
         global_obs, private_obs = self.envs.reset()
+        global_obs, private_obs = self.observation_wrapper(global_obs, private_obs)
         # past_mean_house_action = self.multiple_households_mean_action()
         for _ in range(self.args.init_exploration_steps):
             if exploration_policy == 'uniform':
@@ -276,6 +287,7 @@ class BMFAC_agent:
                     action = {self.envs.government.name: gov_action,
                               self.envs.households.name: hou_action}
                     next_global_obs, next_private_obs, gov_reward, house_reward, done = self.envs.step(action)
+                    next_global_obs, next_private_obs = self.observation_wrapper(next_global_obs, next_private_obs)
 
                 # store the episodes
                 self.buffer.mf_add(global_obs, private_obs, gov_action, hou_action, past_mean_house_action,
@@ -286,6 +298,7 @@ class BMFAC_agent:
                 if done:
                     # if done, reset the environment
                     global_obs, private_obs = self.envs.reset()
+                    global_obs, private_obs = self.observation_wrapper(global_obs, private_obs)
                     # past_mean_house_action = self.multiple_households_mean_action()
         print("Initial exploration has been finished!")
 
@@ -394,6 +407,7 @@ class BMFAC_agent:
         wealth_gini = 0
         for epoch_i in range(self.args.eval_episodes):
             global_obs, private_obs = self.eval_env.reset()
+            global_obs, private_obs = self.observation_wrapper(global_obs, private_obs)
             episode_gov_reward = 0
             episode_mean_house_reward = 0
             step_count = 0
@@ -408,6 +422,7 @@ class BMFAC_agent:
                 with torch.no_grad():
                     action = self._evaluate_get_action(global_obs, private_obs)
                     next_global_obs, next_private_obs, gov_reward, house_reward, done = self.eval_env.step(action)
+                    next_global_obs, next_private_obs = self.observation_wrapper(next_global_obs, next_private_obs)
 
                 step_count += 1
                 episode_gov_reward += gov_reward
@@ -453,28 +468,18 @@ class BMFAC_agent:
         global_obs_tensor = self._get_tensor_inputs(global_obs)
         private_obs_tensor = self._get_tensor_inputs(private_obs)
         gov_pi = self.gov_actor(global_obs_tensor)
-        gov_action = get_action_info(gov_pi, cuda=self.args.cuda).select_actions(exploration=False,
-                                                                                 reparameterize=False)
+        gov_action = get_action_info(gov_pi, cuda=self.args.cuda).select_actions(reparameterize=False)
         hou_pi = self.house_actor(global_obs_tensor, private_obs_tensor, gov_action)
-        hou_action = get_action_info(hou_pi, cuda=self.args.cuda).select_actions(exploration=False,
-                                                                                 reparameterize=False)
+        hou_action = get_action_info(hou_pi, cuda=self.args.cuda).select_actions(reparameterize=False)
+        gov_action = gov_action.cpu().numpy()[0]
+        hou_action = hou_action.cpu().numpy()[0]
 
-        gov_action = gov_action.detach().cpu().numpy()[0]
-        hou_action = hou_action.detach().cpu().numpy()[0]
-        # if self.fix_gov == True:
-        #     # gov_action = np.array([0.1 / 0.2, 0.0 / 0.05, 0, 0, 0.1 / 0.5]) + np.random.normal(0, 0.1, size=(5,))
-        #     temp = np.zeros((self.args.n_households, 2))
-        #     temp[:, 0] = 0.7
-        #     temp[:, 1] = 1 / 3
-        #
-        #     hou_action = temp * 2 - 1
-
-        action = {self.eval_env.government.name: self.gov_action_max * gov_action,
-                  self.eval_env.households.name: self.hou_action_max * hou_action}
+        action = {self.envs.government.name: gov_action,
+                  self.envs.households.name: hou_action}
         return action
 
     # def _evaluate_agent(self):
-    #     np.random.seed(2)
+    #     np.random.seed(1)
     #     total_gov_reward = 0
     #     total_house_reward = 0
     #     total_steps = 0
@@ -487,6 +492,7 @@ class BMFAC_agent:
     #     # for epoch_i in range(self.args.eval_episodes):
     #     for epoch_i in range(1):
     #         global_obs, private_obs = self.eval_env.reset()
+    #         global_obs, private_obs = self.observation_wrapper(global_obs, private_obs)
     #         episode_gov_reward = 0
     #         episode_mean_house_reward = 0
     #         step_count = 0
@@ -504,6 +510,7 @@ class BMFAC_agent:
     #                 # action = self._evaluate_get_action(global_obs, private_obs)
     #                 action = self.test_evaluate_get_action(global_obs, private_obs, step_count)
     #                 next_global_obs, next_private_obs, gov_reward, house_reward, done = self.eval_env.step(action)
+    #                 next_global_obs, next_private_obs = self.observation_wrapper(next_global_obs, next_private_obs)
     #
     #             step_count += 1
     #             episode_gov_reward += gov_reward
@@ -518,6 +525,7 @@ class BMFAC_agent:
     #                 break
     #             # if step_count == 1 or step_count == 10 or step_count == 30 or step_count == 300:
     #             save_parameters(self.model_path, step_count, epoch_i, self.eval_env)
+    #
     #
     #             global_obs = next_global_obs
     #             private_obs = next_private_obs
@@ -544,6 +552,7 @@ class BMFAC_agent:
     #     return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, \
     #            avg_wealth_gini, mean_step
     #
+    #
     # def test_evaluate_get_action(self, global_obs, private_obs, i):
     #     global_obs_tensor = self._get_tensor_inputs(global_obs)
     #     private_obs_tensor = self._get_tensor_inputs(private_obs)
@@ -554,22 +563,9 @@ class BMFAC_agent:
     #                             [0.76172986, 0.24048432, 0.49025352, 0.59911031, 0.189]])
     #     gov_action = gov_actions[i]
     #     print(gov_action)
-    #     # gov_pi = self.gov_actor(global_obs_tensor)
-    #     # gov_action = get_action_info(gov_pi, cuda=self.args.cuda).select_actions(exploration=False,
-    #     #                                                                          reparameterize=False)
     #     hou_pi = self.house_actor(global_obs_tensor, private_obs_tensor, torch.tensor(gov_action, dtype=torch.float32).reshape(1,-1).cuda())
-    #     hou_action = get_action_info(hou_pi, cuda=self.args.cuda).select_actions(exploration=False,
-    #                                                                              reparameterize=False)
-    #
-    #     gov_action = gov_action
-    #     hou_action = hou_action.detach().cpu().numpy()[0]
-    #     # if self.fix_gov == True:
-    #     #     # gov_action = np.array([0.1 / 0.2, 0.0 / 0.05, 0, 0, 0.1 / 0.5]) + np.random.normal(0, 0.1, size=(5,))
-    #     #     temp = np.zeros((self.args.n_households, 2))
-    #     #     temp[:, 0] = 0.7
-    #     #     temp[:, 1] = 1 / 3
-    #     #
-    #     #     hou_action = temp * 2 - 1
+    #     hou_action = get_action_info(hou_pi, cuda=self.args.cuda).select_actions(reparameterize=False)
+    #     hou_action = hou_action.cpu().numpy()[0]
     #
     #     action = {self.eval_env.government.name: self.gov_action_max * gov_action,
     #               self.eval_env.households.name: self.hou_action_max * hou_action}

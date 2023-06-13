@@ -75,21 +75,45 @@ house_action_max = env.households.action_space.high[0]
 # global obs is observed by gov & households; Private obs are observed separately by each household.
 global_obs, private_obs = env.reset()
 
-for _ in range(1000):
+for _ in range(100):
     gov_action = env.government.action_space.sample()
     house_action = env.households.action_space.sample()
 
     action = {env.government.name: gov_action * gov_action_max,  # gov_action & house_action is in (-1,+1)
               env.households.name: house_action * house_action_max}
     next_global_obs, next_private_obs, gov_reward, house_reward, done = env.step(action)
-    print("gov reward:", gov_reward, "--- households reward:", house_reward)
+    print("gov reward:", gov_reward, "\nhouseholds reward:", house_reward)
 
-if done:
-    global_obs, private_obs = env.reset()
+    if done:
+        global_obs, private_obs = env.reset()
 env.close()
-
 ```
-
+If users obtain a similar output as follows, it indicates a successful installation of the TaxAI simulator.
+```text
+gov reward: 0.27574195559515985 
+households reward: [[-14.16824042]
+ [ 13.33342979]
+ [  7.38537561]
+ [ 10.8789686 ]
+ [-16.69487928]
+ [ 10.96102371]
+ [-27.29789107]
+ [ 11.32268419]
+ [-24.14579232]
+ [  9.87050757]]
+gov reward: -0.028681460944447557 
+households reward: [[  7.08354761]
+ [ -7.66086619]
+ [  4.4566605 ]
+ [-19.19874515]
+ [  5.28689801]
+ [ 10.49161175]
+ [  8.16525891]
+ [  7.82208646]
+ [ -2.99427493]
+ [ -1.13584677]]
+ ......
+```
 ## Acknowledgement
 [Reinforcement-learning-algorithms](https://github.com/TianhongDai/reinforcement-learning-algorithms)
 

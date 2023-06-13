@@ -80,10 +80,6 @@ class Household(BaseEntity):
 
 
     def reset(self, **custom_cfg):
-        # self.e_initial(self.n_households)
-        # self.generate_e_ability()
-        # self.real_income, self.at = self.initial_wealth_distribution()
-        # self.at_next = copy.copy(self.at)
         self.e = copy.copy(self.e_0)
         self.e_array = copy.copy(self.e_array_0)
         self.generate_e_ability()
@@ -113,27 +109,9 @@ class Household(BaseEntity):
 
     def get_real_data(self):
         df = pd.read_csv('agents/cfg/scf2013.csv', header=None)
-
-        # income = df[0].values[1:].astype(np.float32)
-        # saving = df[1].values[1:].astype(np.float32)
-        # wage_income = df[2].values[1:].astype(np.float32)
         asset = df[3].values[1:].astype(np.float32)
-        # c_1 = df[4].values[1:].astype(np.float32)
-        # c_2 = df[5].values[1:].astype(np.float32)
-        # c_3 = df[6].values[1:].astype(np.float32)
-        # c_4 = df[7].values[1:].astype(np.float32)
-        # return income, wage_income, asset, (c_1 + c_2 + c_3 + c_4)
         temp = np.unique(asset)[np.unique(asset)>0]
         return temp
-
-    # def sample_real_data(self):
-    #     index = [random.randint(0, len(self.real_income) - 1) for _ in range(self.n_households)]
-    #     batch_wage_income = self.wage_income[index]
-    #     batch_income = self.real_income[index]
-    #     batch_asset = self.real_asset[index]
-    #     batch_consumption = self.real_consumption[index]
-    #     return batch_wage_income.reshape(self.n_households, 1), batch_income.reshape(self.n_households, 1), batch_asset.reshape(self.n_households, 1), batch_consumption.reshape(self.n_households, 1)
-    
     def sample_real_data(self):
         # index = [random.randint(0, len(self.real_asset) - 1) for _ in range(self.n_households)]
         index = np.random.choice(range(0, len(self.real_asset) - 1), self.n_households, replace=False)

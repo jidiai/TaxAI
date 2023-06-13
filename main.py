@@ -3,10 +3,8 @@ import numpy as np
 from env.env_core import economic_society
 from agents.baseline import agent
 from agents.rule_based import rule_agent
-from agents.independent_RL import independent_agent
 from agents.independent_ppo import ppo_agent
 from agents.calibration import calibration_agent
-from agents.MF_bilevel import mf_agent
 from agents.BMFAC import BMFAC_agent
 # from agents.MADDPG.MAAC import maddpg_agent
 from agents.MADDPG_block.MAAC import maddpg_agent
@@ -18,7 +16,7 @@ import yaml
 import argparse
 from omegaconf import OmegaConf
 
-
+# os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default='default')
@@ -88,10 +86,6 @@ if __name__ == '__main__':
         trainer = agent(env, yaml_cfg.Trainer)
     elif args.alg == "rule_based":
         trainer = rule_agent(env, yaml_cfg.Trainer)
-    elif args.alg == "independent":
-        trainer = independent_agent(env, yaml_cfg.Trainer)
-    elif args.alg == "mf":
-        trainer = mf_agent(env, yaml_cfg.Trainer)
     elif args.alg == "ppo":
         trainer = ppo_agent(env, yaml_cfg.Trainer)
     elif args.alg == "bmfac":
@@ -102,8 +96,8 @@ if __name__ == '__main__':
         trainer = calibration_agent(env, yaml_cfg.Trainer)
     # start to learn
     print("n_households: ", yaml_cfg.Trainer["n_households"])
-    # trainer.learn()
-    trainer.test()
+    trainer.learn()
+    # trainer.test()
     # # close the environment
     # env.close()
 

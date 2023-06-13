@@ -126,11 +126,21 @@ class ppo_agent:
             mb_advs[t] = lastgaelam = delta + self.args.ppo_gamma * self.args.ppo_tau * nextnonterminal * lastgaelam
         mb_returns = mb_advs + mb_values
         return mb_obs, mb_actions, mb_returns, mb_advs
+    
+    def observation_wrapper(self, global_obs, private_obs):
+        # global
+        global_obs[0] /= 1e7
+        global_obs[1] /= 1e5
+        global_obs[3] /= 1e5
+        global_obs[4] /= 1e5
+        private_obs[:, 1] /= 1e5
+        return global_obs, private_obs
 
     # start to train the network...
     def learn(self):
         episode_rewards = np.zeros((self.args.n_households, ), dtype=np.float32)
         global_obs, private_obs = self.envs.reset()
+        global_obs, private_obs = self.observation_wrapper(global_obs, private_obs)
         self.obs = self.obs_concate_numpy(global_obs, private_obs, update=False)
         gov_rew = []
         house_rew = []
@@ -165,6 +175,7 @@ class ppo_agent:
                 gov_mb_values.append(gov_values.detach().cpu().numpy().squeeze(0))
                 
                 next_global_obs, next_private_obs, gov_reward, house_reward, done = self.envs.step(action)
+                next_global_obs, next_private_obs = self.observation_wrapper(next_global_obs, next_private_obs)
 
                 self.dones = np.tile(done, (self.args.n_households, 1))
                 mb_dones.append(self.dones)
@@ -174,6 +185,7 @@ class ppo_agent:
                 # clear the observation
                 if done:
                     next_global_obs, next_private_obs = self.envs.reset()
+                    next_global_obs, next_private_obs = self.observation_wrapper(next_global_obs, next_private_obs)
 
                 self.obs = self.obs_concate_numpy(next_global_obs, next_private_obs, update=False)
                 # process the rewards part -- display the rewards on the screen
@@ -228,8 +240,8 @@ class ppo_agent:
         wandb.finish()
 
     def test(self):
-        self.households_net.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/independent_ppo/1000/run2/house_net.pt"))
-        self.gov_net.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/independent_ppo/1000/run2/gov_net.pt"))
+        self.households_net.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/independent_ppo/10/run2/house_net.pt"))
+        # self.gov_net.load_state_dict(torch.load("/home/mqr/code/AI-TaxingPolicy/agents/models/independent_ppo/100/run2/gov_net.pt"))
         mean_gov_rewards, mean_house_rewards, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, avg_wealth_gini, years = self._evaluate_agent()
         print("mean gov reward:", mean_gov_rewards)
 
@@ -306,7 +318,7 @@ class ppo_agent:
         adjust_lr = self.args.p_lr * lr_frac
         for param_group in self.house_optimizer.param_groups:
              param_group['lr'] = adjust_lr
-
+    #
     def _evaluate_agent(self):
         total_gov_reward = 0
         total_house_reward = 0
@@ -319,6 +331,8 @@ class ppo_agent:
         wealth_gini = 0
         for epoch_i in range(self.args.eval_episodes):
             global_obs, private_obs = self.eval_env.reset()
+            global_obs, private_obs = self.observation_wrapper(global_obs, private_obs)
+
             episode_gov_reward = 0
             episode_mean_house_reward = 0
             step_count = 0
@@ -333,6 +347,7 @@ class ppo_agent:
                 with torch.no_grad():
                     action = self._evaluate_get_action(global_obs, private_obs)
                     next_global_obs, next_private_obs, gov_reward, house_reward, done = self.eval_env.step(action)
+                    next_global_obs, next_private_obs = self.observation_wrapper(next_global_obs, next_private_obs)
 
                 step_count += 1
                 episode_gov_reward += gov_reward
@@ -474,8 +489,9 @@ class ppo_agent:
     #     print(gov_action)
     #
     #     # ppo
-    #     # house_actions = select_actions(house_pis)
-    #     # input_actions = self.action_wrapper(house_actions)
+    #     house_actions = select_actions(house_pis)
+    #     input_actions = self.action_wrapper(house_actions)
+    #     print(input_actions)
     #     # random
     #     # temp = np.random.random((self.args.n_households, self.envs.households.action_space.shape[1]))
     #     # input_actions = temp
@@ -484,9 +500,9 @@ class ppo_agent:
     #     # temp[:, 1] = 2 / 3
     #     # ga
     #
-    #     input_actions = fetch_data("ga", i)
+    #     # input_actions = fetch_data("ga", i)
     #
     #     action = {self.envs.government.name: self.gov_action_max * (gov_action * 2 - 1),
     #               self.envs.households.name: self.hou_action_max * input_actions}
     #     return action
-
+    #

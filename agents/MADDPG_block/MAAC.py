@@ -68,18 +68,28 @@ class maddpg_agent:
             agent = MADDPG(self.args, i)
             agents.append(agent)
         return agents
+    
+    def observation_wrapper(self, global_obs, private_obs):
+        # global
+        global_obs[0] /= 1e7
+        global_obs[1] /= 1e5
+        global_obs[3] /= 1e5
+        global_obs[4] /= 1e5
+        private_obs[:, 1] /= 1e5
+        return global_obs, private_obs
 
     def learn(self):
         # reset the environment
         global_obs, private_obs = self.envs.reset()
+        global_obs, private_obs = self.observation_wrapper(global_obs, private_obs)
         gov_rew = []
         house_rew = []
         epochs = []
         sum_actor_loss = 0
         sum_critic_loss = 0
 
-        # for epoch in range(self.args.n_epochs):
-        for epoch in range(1):
+        for epoch in range(self.args.n_epochs):
+        # for epoch in range(1):
             # for each epoch, it will reset the environment
             for t in range(self.args.epoch_length):
                 '''
@@ -110,7 +120,8 @@ class maddpg_agent:
                 action = {self.envs.government.name: gov_action,
                           self.envs.households.name: hou_action}
                 next_global_obs, next_private_obs, gov_reward, house_reward, done = self.envs.step(action)
-
+                
+                next_global_obs, next_private_obs = self.observation_wrapper(next_global_obs, next_private_obs)
                 # store the episodes
                 self.buffer.add(global_obs, private_obs, gov_action, hou_action, gov_reward, house_reward,
                                 next_global_obs, next_private_obs, float(done))
@@ -120,9 +131,10 @@ class maddpg_agent:
                 if done:
                     # if done, reset the environment
                     global_obs, private_obs = self.envs.reset()
+                    global_obs, private_obs = self.observation_wrapper(global_obs, private_obs)
 
             # for _ in range(self.args.update_cycles):
-                if t % 1 == 0:
+                if t % 10 == 0:
                     # after collect the samples, start to update the network
                     transitions = self.buffer.sample(self.args.batch_size)
                     sum_actor_loss = 0
@@ -196,6 +208,7 @@ class maddpg_agent:
         wealth_gini = 0
         for epoch_i in range(self.args.eval_episodes):
             global_obs, private_obs = self.eval_env.reset()
+            global_obs, private_obs = self.observation_wrapper(global_obs, private_obs)
             episode_gov_reward = 0
             episode_mean_house_reward = 0
             step_count = 0
@@ -210,6 +223,7 @@ class maddpg_agent:
                 with torch.no_grad():
                     action = self._evaluate_get_action(global_obs, private_obs)
                     next_global_obs, next_private_obs, gov_reward, house_reward, done = self.eval_env.step(action)
+                    next_global_obs, next_private_obs = self.observation_wrapper(next_global_obs, next_private_obs)
             
                 step_count += 1
                 episode_gov_reward += gov_reward
@@ -258,20 +272,20 @@ class maddpg_agent:
         n_global_obs = global_obs_tensor.repeat(self.envs.households.n_households, 1)
         obs = torch.cat([n_global_obs, private_obs_tensor],
                         dim=-1)
-        # # 根据wealth 排序observation
-        # sorted_indices = torch.argsort(obs[:, -1], descending=True)
-        # sorted_obs = obs[sorted_indices]
-        # num_set = range(0, self.envs.households.n_households)
-        # for i in range(self.args.agent_block_num - 1):
-        #     if i == 0:
-        #         num = num_set[:int(0.1 * self.envs.households.n_households)]
-        #     elif i == 1:
-        #         num = num_set[int(0.1 * self.envs.households.n_households):int(0.5 * self.envs.households.n_households)]
-        #     else:
-        #         num = num_set[int(0.5 * self.envs.households.n_households):]
-        #     hou_action[num] = self.agents[i].select_action(sorted_obs[num], self.noise, self.epsilon)
-        temp = np.random.random((self.args.n_households, self.envs.households.action_space.shape[1]))
-        hou_action = temp * 2 - 1
+        # 根据wealth 排序observation
+        sorted_indices = torch.argsort(obs[:, -1], descending=True)
+        sorted_obs = obs[sorted_indices]
+        num_set = range(0, self.envs.households.n_households)
+        for i in range(self.args.agent_block_num - 1):
+            if i == 0:
+                num = num_set[:int(0.1 * self.envs.households.n_households)]
+            elif i == 1:
+                num = num_set[int(0.1 * self.envs.households.n_households):int(0.5 * self.envs.households.n_households)]
+            else:
+                num = num_set[int(0.5 * self.envs.households.n_households):]
+            hou_action[num] = self.agents[i].select_action(sorted_obs[num], self.noise, self.epsilon)
+        # temp = np.random.random((self.args.n_households, self.envs.households.action_space.shape[1]))
+        # hou_action = temp * 2 - 1
     
         action = {self.envs.government.name: gov_action,
                   self.envs.households.name: hou_action}

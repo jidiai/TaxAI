@@ -81,8 +81,7 @@ class MADDPG:
         house_rewards = torch.tensor(house_reward, dtype=torch.float32, device='cuda' if self.args.cuda else 'cpu')
         next_global_obses = torch.tensor(next_global_obs, dtype=torch.float32, device='cuda' if self.args.cuda else 'cpu')
         next_private_obses = torch.tensor(next_private_obs, dtype=torch.float32, device='cuda' if self.args.cuda else 'cpu')
-        inverse_dones = torch.tensor(1 - done, dtype=torch.float32,
-                                     device='cuda' if self.args.cuda else 'cpu').unsqueeze(-1)
+        inverse_dones = torch.tensor(1 - done, dtype=torch.float32, device='cuda' if self.args.cuda else 'cpu').unsqueeze(-1)
 
         num_set = range(0, self.args.n_households)
         num = []
@@ -96,6 +95,7 @@ class MADDPG:
         hou_actions = hou_actions[np.arange(self.args.batch_size)[:, None], sorted_index]
         house_rewards = house_rewards[np.arange(self.args.batch_size)[:, None], sorted_index]
         next_private_obses = next_private_obses[np.arange(self.args.batch_size)[:, None], sorted_index]
+        # inverse_dones = inverse_dones[np.arange(self.args.batch_size)[:, None], sorted_index]
         
         if self.agent_id == self.args.agent_block_num - 1:  # government agent
             r = gov_rewards.view(-1, 1)
@@ -126,7 +126,7 @@ class MADDPG:
                     index += 1
             u_next = torch.cat(u_next, dim=1)
             flatten_o_next = torch.cat((next_private_obses.reshape(self.args.batch_size,-1),next_global_obses), dim=-1)
-            q_next = self.critic_target_network(flatten_o_next, u_next).detach()
+            q_next = (self.critic_target_network(flatten_o_next, u_next).detach()) * inverse_dones
             if self.agent_id == self.args.agent_block_num - 1:
                 target_q = (r + self.args.gamma * q_next).detach()
             else:
@@ -138,6 +138,9 @@ class MADDPG:
         else:
             q_value = self.critic_network(o, u).unsqueeze(2).repeat(1,len(num[self.agent_id]),1)
         critic_loss = (target_q - q_value).pow(2).mean()
+        self.critic_optim.zero_grad()
+        critic_loss.backward()
+        self.critic_optim.step()
 
         # the actor loss
         # 重新选择联合动作中当前agent的动作，其他agent的动作不变
@@ -155,9 +158,7 @@ class MADDPG:
         self.actor_optim.zero_grad()
         actor_loss.backward()
         self.actor_optim.step()
-        self.critic_optim.zero_grad()
-        critic_loss.backward()
-        self.critic_optim.step()
+
 
         self._soft_update_target_network()
         self.train_step += 1

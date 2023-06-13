@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch import optim
 import os,sys
 import wandb
+import time
 sys.path.append(os.path.abspath('../..'))
 
 from agents.models import SharedAgent, SharedCritic, Actor, Critic
@@ -106,6 +107,8 @@ class rule_agent:
         gdp = 0
         income_gini = 0
         wealth_gini = 0
+        step_time = 0
+        epochs_time = 0
         for epoch_i in range(self.args.eval_episodes):
             global_obs, private_obs = self.eval_env.reset()
             episode_gov_reward = 0
@@ -117,12 +120,17 @@ class rule_agent:
             episode_gdp = []
             episode_income_gini = []
             episode_wealth_gini = []
+            episode_time = []
         
             while True:
                 with torch.no_grad():
                     action = self._evaluate_get_action(global_obs, private_obs)
+                    start_time = time.time()
                     next_global_obs, next_private_obs, gov_reward, house_reward, done = self.eval_env.step(action)
-            
+                    end_time = time.time()
+                    execution_time = end_time - start_time
+                
+                episode_time.append(execution_time)
                 step_count += 1
                 episode_gov_reward += gov_reward
                 episode_mean_house_reward += np.mean(house_reward)
@@ -139,7 +147,9 @@ class rule_agent:
             
                 global_obs = next_global_obs
                 private_obs = next_private_obs
-        
+            
+            step_time += np.mean(episode_time)
+            epochs_time += np.sum(episode_time)
             total_gov_reward += episode_gov_reward
             total_house_reward += episode_mean_house_reward
             total_steps += step_count
@@ -159,20 +169,25 @@ class rule_agent:
         avg_gdp = gdp / self.args.eval_episodes
         avg_income_gini = income_gini / self.args.eval_episodes
         avg_wealth_gini = wealth_gini / self.args.eval_episodes
+        step_time /= self.args.eval_episodes
+        epochs_time /= self.args.eval_episodes
+        print("each step:", 1/step_time)
+        print("each epoch:", 1/epochs_time)
         return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, \
                avg_wealth_gini, mean_step
     def _evaluate_get_action(self, global_obs, private_obs):
-        # gov_action = np.array([0.5, 0.01, 0.5, 0.01, 0.189/0.5])
-        gov_action = np.array([0, 0., 0, 0, 0/0.5])
+        gov_action = np.array([0.5, 0.01, 0.5, 0.01, 0.189/0.5])
+        # gov_action = np.array([0, 0., 0, 0, 0/0.5])
         # gov_action = np.random.random(5)
+        
         temp = np.random.random((self.args.n_households, self.envs.households.action_space.shape[1]))
-        # temp[:, 0] = 0.7
-        # temp[:, 1] = 1 / 3
-        #
         # hou_action = temp * 2 - 1
+        
+        temp[:, 0] = 0.7
+        temp[:, 1] = 1 / 3
 
         hou_action = temp * 2 - 1
-        
+
         action = {self.eval_env.government.name: self.gov_action_max * (gov_action * 2 - 1),
                   self.eval_env.households.name: self.hou_action_max * hou_action}
         return action
