@@ -47,7 +47,7 @@ alg = {
         MADDPG: "maddpg",
         BMFAC: "bmfac" }
 
-task = {max GDP:"gdp", min Gini: "gini", max social welfare: "social_welfare"}
+task = {max GDP:"gdp", min Gini: "gini", max social welfare: "social_welfare", multi-task: "gdp_gini"}
 
    "device-num" means GPU index
 
