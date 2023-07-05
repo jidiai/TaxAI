@@ -1,6 +1,6 @@
-from entities.base import BaseEntity
-from entities.government import Government
-from utils.episode import EpisodeKey
+from TaxAI.entities.base import BaseEntity
+from TaxAI.entities.government import Government
+from TaxAI.utils.episode import EpisodeKey
 import numpy as np
 import copy
 import math
@@ -108,7 +108,11 @@ class Household(BaseEntity):
         return asset
 
     def get_real_data(self):
-        df = pd.read_csv('agents/cfg/scf2013.csv', header=None)
+        from pathlib import Path
+        import os
+        CURRENT_PATH = str(Path(__file__).resolve().parent.parent)
+
+        df = pd.read_csv(os.path.join(CURRENT_PATH,'agents/cfg/scf2013.csv'), header=None)
         asset = df[3].values[1:].astype(np.float32)
         temp = np.unique(asset)[np.unique(asset)>0]
         return temp

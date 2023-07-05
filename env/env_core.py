@@ -1,6 +1,6 @@
-from entities.base import BaseEntity
-from entities.household import Household
-from entities.government import Government
+from TaxAI.entities.base import BaseEntity
+from TaxAI.entities.household import Household
+from TaxAI.entities.government import Government
 import numpy as np
 import math
 import torch
@@ -232,7 +232,9 @@ class economic_society:
         income = self.income
         wealth = self.households.at_next
         sorted_income_index = sorted(range(len(income)), key=lambda k: income[k], reverse=True)
-        top10_income_index = sorted_income_index[:int(0.1*self.households.n_households)]
+        _idx = 1 if 0<0.1*self.households.n_households<1 else int(0.1*self.households.n_households)
+        
+        top10_income_index = sorted_income_index[:_idx]
         bottom50_income_index = sorted_income_index[int(0.5*self.households.n_households):]
         top10_income = income[top10_income_index]
         top10_e = self.households.e[top10_income_index]
@@ -240,7 +242,7 @@ class economic_society:
         bot50_e = self.households.e[bottom50_income_index]
 
         sorted_wealth_index = sorted(range(len(wealth)), key=lambda k: wealth[k], reverse=True)
-        top10_wealth_index = sorted_wealth_index[:int(0.1*self.households.n_households)]
+        top10_wealth_index = sorted_wealth_index[:_idx]
         bottom50_wealth_index = sorted_wealth_index[int(0.5*self.households.n_households):]
         top10_wealth = wealth[top10_wealth_index]
         bot50_wealth = wealth[bottom50_wealth_index]
@@ -307,6 +309,9 @@ class economic_society:
 
 
     def render(self):
+        if not hasattr(self, 'households_reward'):
+            return
+            
         if not self.display_mode:
             self.background = pygame.display.set_mode([500,500])
             self.display_mode = True
@@ -327,7 +332,7 @@ class economic_society:
         debug("Tau_a"+"{:.3g}".format(self.government.tau_a), x=10, y=120)
         debug("Xi_a: "+"{:.3g}".format(self.government.xi_a), x=10, y=140)
         debug("Gt_prob: "+"{:.3g}".format(self.Gt_prob), x=10, y=160)
-        debug("Bt2At: "+"{:.3g}".format(self.Bt2At), x=10, y=180)
+        # debug("Bt2At: "+"{:.3g}".format(self.Bt2At), x=10, y=180)
 
         house_img = pygame.transform.scale(self.house_img, (50, 50))
         self.background.blit(house_img, [200,400])
@@ -370,7 +375,7 @@ class economic_society:
             pygame.quit()
             self.isopen = False
 
-render=False
+render=True
 if render:
 
 

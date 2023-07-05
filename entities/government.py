@@ -1,5 +1,5 @@
-from entities.base import BaseEntity
-from utils.episode import EpisodeKey
+from TaxAI.entities.base import BaseEntity
+from TaxAI.utils.episode import EpisodeKey
 import math
 import copy
 import numpy as np
