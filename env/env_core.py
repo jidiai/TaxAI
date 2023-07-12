@@ -3,7 +3,6 @@ from TaxAI.entities.household import Household
 from TaxAI.entities.government import Government
 import numpy as np
 import math
-import torch
 from gym.spaces import Box
 import copy
 import pygame
