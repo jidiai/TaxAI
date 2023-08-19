@@ -1,8 +1,22 @@
-# TaxAI
+# TaxAI: A Dynamic Economic Simulator and Benchmark for Multi-Agent Reinforcement Learning
+
+<div style="text-align:center">
+  <img src="./img/render.jpg" alt="示例图片" width=30%>
+  <figcaption style="text-align:center;"></figcaption>
+</div>
+
 
 The optimization of fiscal policies by governments to stimulate economic growth, ensure social equity and stability, and maximize social welfare has been a subject of significant interest. Simultaneously, individuals keenly observe government policies to optimize their own production and saving strategies. 
 
 To simulate this problem, we propose a multi-agent reinforcement learning simulator based on the Bewley-Aiyagari model. Our simulator encompasses various economic activities of governments, households, technology, and financial intermediaries. By integrating reinforcement learning algorithms, it enables the derivation of optimal strategies for governments and individuals while facilitating the study of the relationship between government policies, micro-level household behaviors, and macroeconomic phenomena.
+
+### A comparison of MARL simulators for optimal taxation problems
+
+<div style="text-align:center">
+  <img src="./img/compare.png" alt="示例图片" width=80%>
+  <figcaption style="text-align:center;"></figcaption>
+</div>
+
 
 
 ## Installation
@@ -10,6 +24,7 @@ To simulate this problem, we propose a multi-agent reinforcement learning simula
 ```bash
 git clone https://github.com/jidiai/TaxAI.git
 ```
+
 
 
 ## Requirements
@@ -57,6 +72,7 @@ task = {max GDP:"gdp", min Gini: "gini", max social welfare: "social_welfare", m
 
 The TaxAI API's API models environments as simple Python `env` classes. Creating environment instances and interacting with them is very simple- here's an example using the "gdp" environment:
 you can change government task in './cfg/default.yaml'.
+
 ```bash
 gov_task: "gdp"  # choices: {"gdp", "gini", "social_welfare", "gdp_gini"}
 ```
@@ -114,7 +130,58 @@ households reward: [[  7.08354761]
  [ -1.13584677]]
  ......
 ```
+## Markov Game
+
+<div style="text-align:center">
+  <img src="./img/markov games flow.jpg" alt="示例图片" width=80%>
+  <figcaption style="text-align:center;"></figcaption>
+</div>
+
+The Markov game between the government and household agents. In the center of the figure, we display the Lorenz curves of households' wealth distribution.  The global observation consists of the average assets $\bar{a}_t$, income $\bar{i}_t$, and productivity level $\bar{e}_t$ of the 50\% poorest households and 10\% richest households, along with the wage rate $W_t$. For the government agent, it observes the global observation and takes tax and spending actions $\{\tau_t, \xi_t, \tau_{a,t}, \xi_{a,t}, r^G_t\}$ through the actor network. For household agents, they observe both global and private observation, including personal assets $\{a^i_t\}$ and productivity level $\{e^i_t\}$, and generate savings and workings actions $\{p^i_t, h^i_t\}$ through the actor network. The actor network structure in the figure is just an example.
+
+
+
+## Experiment Results
+
+### 1. Optimal Solution in Dynamic Game
+
+<div style="text-align:center">
+  <img src="./img/results.jpg" alt="示例图片" width=100%>
+  <figcaption style="text-align:center;"></figcaption>
+</div>
+
+### 2. Households Dynamic Responses
+
+<div style="text-align:center">
+  <img src="./img/tax_action.jpg" alt="示例图片" width=100%>
+  <figcaption style="text-align:center;"></figcaption>
+</div>
+
+### 3. Scalability of Environment
+
+<div style="text-align:center">
+  <img src="./img/scalability.png" alt="示例图片" width=80%>
+  <figcaption style="text-align:center;"></figcaption>
+</div>
+
+### 4. AI-based Policy Analysis
+
+<div style="text-align:center">
+  <img src="./img/maddpg_indicators.jpg" alt="示例图片" width=100%>
+  <figcaption style="text-align:center;"></figcaption>
+</div>
+
+
+
+### 5. Training Curves
+
+<div style="text-align:center">
+  <img src="./img/training_curves.jpg" alt="示例图片" width=100%>
+  <figcaption style="text-align:center;"></figcaption>
+</div>
+
 ## Acknowledgement
+
 [Reinforcement-learning-algorithms](https://github.com/TianhongDai/reinforcement-learning-algorithms)
 
 [MADDPG](https://github.com/starry-sky6688/MADDPG)
