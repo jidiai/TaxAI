@@ -3,17 +3,16 @@ import numpy as np
 from env.env_core import economic_society
 from agents.baseline import agent
 from agents.rule_based import rule_agent
-from agents.independent_ppo import ppo_agent
+from agents.independent_ppo import ippo_agent
 from agents.calibration import calibration_agent
 from agents.BMFAC import BMFAC_agent
 from agents.MADDPG_block.MAAC import maddpg_agent
+from agents.ppo.ppo_agent import ppo_agent
 from utils.seeds import set_seeds
-from arguments import get_args
 import os
 import argparse
 from omegaconf import OmegaConf
 
-# os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default='default')
@@ -29,8 +28,7 @@ def parse_args():
     parser.add_argument('--update_cycles', type=int, default=100, help='[10，100，1000]')
     parser.add_argument('--update_freq', type=int, default=10, help='[10，20，30]')
     parser.add_argument('--initial_train', type=int, default=10, help='[10，100，200]')
-    # parser.add_argument('--update_freq', type=int, default=1, help='the number of total households')
-    # parser.add_argument('--initial_train', type=int, default=2000, help='the number of total households')
+
 
     args = parser.parse_args()
     return args
@@ -43,8 +41,6 @@ if __name__ == '__main__':
     args = parse_args()
     path = args.config
     yaml_cfg = OmegaConf.load(f'./cfg/{path}.yaml')
-    # todo if local run code
-    # yaml_cfg = OmegaConf.load(f'D:\\code\\AI-TaxingPolicy\\AI-TaxingPolicy\\cfg\\default.yaml')
     yaml_cfg.Trainer["n_households"] = args.n_households
     yaml_cfg.Environment.Entities[1]["entity_args"].n = args.n_households
     yaml_cfg.Environment.env_core["env_args"].gov_task = args.task
@@ -67,6 +63,8 @@ if __name__ == '__main__':
         trainer = rule_agent(env, yaml_cfg.Trainer)
     elif args.alg == "ppo":
         trainer = ppo_agent(env, yaml_cfg.Trainer)
+    elif args.alg == "ippo":
+        trainer = ippo_agent(env, yaml_cfg.Trainer)
     elif args.alg == "bmfac":
         trainer = BMFAC_agent(env, yaml_cfg.Trainer)
     elif args.alg == "maddpg":
@@ -76,7 +74,7 @@ if __name__ == '__main__':
     # start to learn
     print("n_households: ", yaml_cfg.Trainer["n_households"])
     trainer.learn()
-    # trainer.test()
+    trainer.test()
     # # close the environment
     # env.close()
 

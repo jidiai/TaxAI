@@ -1,6 +1,4 @@
 from entities.base import BaseEntity
-from entities.government import Government
-from utils.episode import EpisodeKey
 import numpy as np
 import copy
 import math
@@ -108,7 +106,7 @@ class Household(BaseEntity):
         return asset
 
     def get_real_data(self):
-        df = pd.read_csv('agents/cfg/scf2013.csv', header=None)
+        df = pd.read_csv('agents/cfg/scf2013.csv', header=None) # '/home/mqr/code/MARL/TaxAI/cfg/scf2013.csv'
         asset = df[3].values[1:].astype(np.float32)
         temp = np.unique(asset)[np.unique(asset)>0]
         return temp

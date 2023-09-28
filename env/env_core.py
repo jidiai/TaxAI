@@ -1,4 +1,4 @@
-from entities.base import BaseEntity
+
 from entities.household import Household
 from entities.government import Government
 import numpy as np
@@ -9,7 +9,7 @@ import copy
 import pygame
 import sys
 import os
-import inspect
+
 
 from pathlib import Path
 ROOT_PATH = str(Path(__file__).resolve().parent.parent)
@@ -125,10 +125,10 @@ class economic_society:
         Gt = self.Gt_prob * self.GDP
 
         self.income = self.WageRate * self.households.e * self.ht + self.interest_rate * self.households.at
-        income_tax, asset_tax = self.tax_function(self.income, self.households.at)
+        self.income_tax, self.asset_tax = self.tax_function(self.income, self.households.at)
 
-        self.post_income = self.income - income_tax
-        post_asset = self.households.at - asset_tax
+        self.post_income = self.income - self.income_tax
+        post_asset = self.households.at - self.asset_tax
         total_wealth = self.post_income + post_asset
 
         # compute tax
@@ -141,7 +141,7 @@ class economic_society:
 
         consumption_tax = self.consumption * self.consumption_tax_rate
         self.households.at_next = total_wealth - self.consumption * (1+self.consumption_tax_rate)
-        self.tax_array = income_tax + asset_tax + consumption_tax
+        self.tax_array = self.income_tax + self.asset_tax + consumption_tax
         self.Bt_next = (1 + self.interest_rate) * self.Bt + Gt - np.sum(self.tax_array)
         #self.Kt_next = np.sum(self.households.at_next) - self.Bt_next
         self.Kt_next = np.sum(self.households.at_next) - self.Bt_next + (self.alpha * (self.Kt/self.Lt)**(self.alpha-1)+1-self.depreciation_rate ) *self.Kt + (1+self.interest_rate) *(self.Bt - np.sum(self.households.at))
@@ -212,7 +212,7 @@ class economic_society:
         self.done = False
 
         self.Kt = copy.copy(self.Kt_next)
-        self.Lt = np.sum(self.households.at) * (1-6.6*0.04)/6.6  # for calibration
+        self.Lt = np.sum(self.households.at) * (1.0-6.6*0.04)/6.6  # for calibration
         self.WageRate = (1 - self.alpha) * np.power(self.Kt / self.Lt, self.alpha)
         self.workingHours = np.ones((self.households.n_households,1))/3
         self.hours_max = self.Lt/np.sum(self.households.e * self.WageRate*self.workingHours)
@@ -265,7 +265,7 @@ class economic_society:
     def gini_coef(self, wealths):
         cum_wealths = np.cumsum(sorted(np.append(wealths, 0)))
         sum_wealths = cum_wealths[-1]
-        xarray = np.array(range(0, len(cum_wealths))) / np.float(len(cum_wealths) - 1)
+        xarray = np.array(range(0, len(cum_wealths))) / (len(cum_wealths) - 1)
         yarray = cum_wealths / sum_wealths
         B = np.trapz(yarray, x=xarray)
         A = 0.5 - B

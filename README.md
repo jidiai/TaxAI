@@ -1,7 +1,7 @@
 # TaxAI: A Dynamic Economic Simulator and Benchmark for Multi-Agent Reinforcement Learning
 
 <div style="text-align:center">
-  <img src="./img/render.jpg" alt="示例图片" width=30%>
+  <img src="./img/new_model_dynamics.png" alt="示例图片" >
   <figcaption style="text-align:center;"></figcaption>
 </div>
 
@@ -12,70 +12,50 @@ To simulate this problem, we propose a multi-agent reinforcement learning simula
 
 ### A comparison of MARL simulators for optimal taxation problems
 
-<div style="text-align:center">
-  <img src="./img/compare.png" alt="示例图片" width=80%>
-  <figcaption style="text-align:center;"></figcaption>
-</div>
+| Simulator             | AI Economist | RBC Model  | **TaxAI** (ours) |
+|-------------------------|--------------|--------------|---------------------|
+| Households' Number    | 10           | 100        | 10000               |
+| Tax Schedule          | Non-linear   | Linear     | Non-linear          |
+| Tax Type              | Income       | Income     | Income & Wealth & Consumption  |
+| Social Roles' Types   | 2            | 3          | 4                   |
+| Saving Strategy       | &#x2716;    | &#x2714;| &#x2714;         |
+| Heterogenous Agent    | &#x2714;     | &#x2714;| &#x2714;         |
+| Real-data Calibration | &#x2716;    | &#x2716;  | &#x2714;         |
+| Open source           | &#x2714;  | &#x2716;  | &#x2714;         |
+| MARL Benchmark        | &#x2716;    | &#x2716;  | &#x2714;         |
 
 
 
-## Installation
+## Install
+
+You can use any tool to manage your python environment. Here, we use conda as an example.
+
+1. Install conda/miniconda.
+
+2. Build a Python virtual environment.
+```bash
+conda create -n TaxAI python=3.6
+```
+
+3. Activate the virtual environment
 
 ```bash
+conda activate TaxAI
+```
+
+4. Clone the repository and install the required dependencies
+```bash 
 git clone https://github.com/jidiai/TaxAI.git
-```
-
-
-
-## Requirements
-
-1. Build a Python virtual environment
-
-   ```bash
-   conda create -n TaxAI python=3.6
-   ```
-
-2. Activate the virtual environment
-
-   ```bash
-   conda activate TaxAI
-   ```
-
-3. Install the requirements package
-
-   ```bash 
-   pip install -r requirements.txt
-   ```
-
-
-
-## Run
-
-```bash
 cd TaxAI
-python main.py --device-num 0 --n_households 10 --alg "ppo" --task "gdp" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+pip install -r requirements.txt
 ```
 
-alg = {
-        Free market policy: "rule_based",
-        Independent PPO: "ppo",
-        MADDPG: "maddpg",
-        BMFAC: "bmfac" }
-
-task = {max GDP:"gdp", min Gini: "gini", max social welfare: "social_welfare", multi-task: "gdp_gini"}
-
-   "device-num" means GPU index
-
-
-
-## Env API
-
-The TaxAI API's API models environments as simple Python `env` classes. Creating environment instances and interacting with them is very simple- here's an example using the "gdp" environment:
-you can change government task in './cfg/default.yaml'.
-
+## Execution
+After installation, run an example experiment by executing the following command from the home folder:
 ```bash
-gov_task: "gdp"  # choices: {"gdp", "gini", "social_welfare", "gdp_gini"}
+python run_a_game.py
 ```
+or run python code as follows:
 
 ```python
 from env.env_core import economic_society
@@ -130,6 +110,91 @@ households reward: [[  7.08354761]
  [ -1.13584677]]
  ......
 ```
+
+## Algorithms Benchmark
+We support traditional economic methods and multiple MARL algorithms on benchmark scenarios.
+
+
+### Scenarios
+We design 4 tasks in TaxAI, and users can design different weights when optimizing multiple tasks.
+```bash
+gov_task: "gdp"  # choices: {"gdp", "gini", "social_welfare", "gdp_gini"}
+```
+- **Maximizing GDP Growth Rate**: The economic growth can be measured by Gross Domestic Product (GDP). Without considering imports and exports in an open economy, GDP is equal to the output $Y_t$ in our model. 
+Based on reality, we set the government's objective to maximize the GDP growth rate.
+
+- **Minimizing Social Inequality**: Social equality and stability build the foundation for all social activities. Social inequality is usually measured by the Gini coefficient of wealth distribution $\mathcal{W}_t$ and income distribution $\mathcal{I}_t$. The Gini coefficient is calculated by the ratio of the area between the Lorenz curve and the perfect equality line, divided by the total area under the perfect equality line(shown in figure~\ref{fig:markov game}). The Gini coefficient ranges between 0 (perfect equality) and 1 (perfect inequality).
+
+- **Maximizing Social Welfare**: Social welfare is an important indicator to present the happiness of the population, which is computed by the sum of all households' lifetime utility.
+
+- **Optimizing Multiple Tasks**: If the government aims to simultaneously optimize multiple objectives, we weigh and sum up multiple objectives. The weights $\omega_1$, $\omega_2$ indicate the relative importance of gini and welfare objectives.
+
+### Supported algorithms
+
+(1) Traditional Economic Methods: 
+- Free Market Policy
+- Genetic Algorithm (GA)
+
+(2) Independent Learning: 
+- Independent PPO
+
+(3) Centralized Training Distributed Execution (CTDE): 
+- MADDPG
+- MAPPO
+
+(4) Heterogeneous-Agent Reinforcement Learning (HARL): 
+- HAPPO
+- HATRPO
+- HAA2C
+
+(5) Mean Field Multi-Agent Reinforcement Learning (MF-MARL): 
+- Bi-level Mean Field Actor-Critic (BMFAC)
+
+
+### Train agents
+
+1. Train free-market agents.
+```bash
+cd TaxAI
+python main.py --n_households 10 --alg "rule_based" --task "gdp" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+python main.py --n_households 10 --alg "rule_based" --task "gini" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+python main.py --n_households 10 --alg "rule_based" --task "social_welfare" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+python main.py --n_households 10 --alg "rule_based" --task "gdp_gini" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+```
+
+2. Train IPPO agents.
+```bash
+cd TaxAI
+python main.py --n_households 10 --alg "ppo" --task "gdp" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+python main.py --n_households 10 --alg "ppo" --task "gini" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+python main.py --n_households 10 --alg "ppo" --task "social_welfare" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+python main.py --n_households 10 --alg "ppo" --task "gdp_gini" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+```
+
+3. Train MADDPG agents.
+```bash
+cd TaxAI
+python main.py --n_households 10 --alg "maddpg" --task "gdp" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+python main.py --n_households 10 --alg "maddpg" --task "gini" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+python main.py --n_households 10 --alg "maddpg" --task "social_welfare" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+python main.py --n_households 10 --alg "maddpg" --task "gdp_gini" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+```
+
+4. Train BMFAC agents.
+```bash
+cd TaxAI
+python main.py --n_households 10 --alg "bmfac" --task "gdp" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+python main.py --n_households 10 --alg "bmfac" --task "gini" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+python main.py --n_households 10 --alg "bmfac" --task "social_welfare" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+python main.py --n_households 10 --alg "bmfac" --task "gdp_gini" --seed 2 --hidden_size 128 --q_lr 3e-4 --p_lr 3e-4 --batch_size 128
+```
+
+
+5. Train HARL/MAPPO agents.
+   (to add)
+
+
+
 ## Markov Game
 
 <div style="text-align:center">
@@ -137,7 +202,7 @@ households reward: [[  7.08354761]
   <figcaption style="text-align:center;"></figcaption>
 </div>
 
-The Markov game between the government and household agents. In the center of the figure, we display the Lorenz curves of households' wealth distribution.  The global observation consists of the average assets $\bar{a}_t $, income $\bar{i}_t $, and productivity level $\bar{e}_t $ of the 50\% poorest households and 10\% richest households, along with the wage rate $W_t$. For the government agent, it observes the global observation and takes tax and spending actions $\{\tau_t, \xi_t, \tau_{a,t}, \xi_{a,t}, r^G_t\} $ through the actor network. For household agents, they observe both global and private observation, including personal assets $\{a^i_t\}$ and productivity level $\{e^i_t\}$, and generate savings and workings actions $\{p^i_t, h^i_t\}$ through the actor network. The actor network structure in the figure is just an example.
+The Markov game between the government and household agents. In the center of the figure, we display the Lorenz curves of households' wealth distribution.  The global observation consists of the average assets $\bar{a}_t$, income $\bar{i}_t$, and productivity level $\bar{e}_t$ of the 50\% poorest households and 10\% richest households, along with the wage rate $W_t$. For the government agent, it observes the global observation and takes tax and spending actions $\{\tau_t, \xi_t, \tau_{a,t}, \xi_{a,t}, r^G_t\}$ through the actor network. For household agents, they observe both global and private observation, including personal assets $\{a^i_t\}$ and productivity level $\{e^i_t\}$, and generate savings and workings actions $\{p^i_t, h^i_t\}$ through the actor network. The actor network structure in the figure is just an example.
 
 
 
@@ -185,3 +250,9 @@ The Markov game between the government and household agents. In the center of th
 [Reinforcement-learning-algorithms](https://github.com/TianhongDai/reinforcement-learning-algorithms)
 
 [MADDPG](https://github.com/starry-sky6688/MADDPG)
+
+[HARL](https://github.com/PKU-MARL/HARL)
+
+## Contact
+If you have any questions about this repo, feel free to leave an issue. 
+You can also contact current maintainers Qirui Mi by email miqirui2021@ia.ac.cn.

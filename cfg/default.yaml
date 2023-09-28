@@ -39,7 +39,7 @@ Trainer:
   n_households: 10
   log_std_min:  -20
   log_std_max:  2
-  hidden_size:  128
+  hidden_size:  256
   cuda: True
   q_lr: 3e-4
   p_lr: 3e-4
