@@ -24,7 +24,7 @@ To simulate this problem, we propose a multi-agent reinforcement learning simula
 | Open source           | &#x2714;  | &#x2716;  | &#x2714;         |
 | MARL Benchmark        | &#x2716;    | &#x2716;  | &#x2714;         |
 
-
+Our paper: [TaxAI: A Dynamic Economic Simulator and Benchmark for Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2309.16307)
 
 ## Install
 
