@@ -64,8 +64,8 @@ class maddpg_agent:
         if self.wandb:
             wandb.init(
                 config=self.args,
-                project="AI_TaxingPolicy",
-                entity="ai_tax",
+                project="TaxAI",
+                entity="taxai",
                 name=self.model_path.parent.parent.name + "-"+ self.model_path.name +'  n='+ str(self.args.n_households),
                 dir=str(self.model_path),
                 job_type="training",
@@ -111,7 +111,7 @@ class maddpg_agent:
                 
                 n_global_obs = global_obs_tensor.repeat(self.envs.households.n_households, 1)
                 obs = torch.cat([n_global_obs, private_obs_tensor], dim=-1)  # torch.cat([global_obs_tensor.repeat(self.envs.households.n_households, 1), private_obs_tensor], dim=-1)
-                # 根据wealth 排序observation
+                # sort observation according to wealth levels
                 sorted_indices = torch.argsort(obs[:, -1], descending=True)
                 sorted_obs = obs[sorted_indices]
                 num_set = range(0,self.envs.households.n_households)
@@ -131,9 +131,6 @@ class maddpg_agent:
                 next_global_obs, next_private_obs, gov_reward, house_reward, done = self.envs.step(action)
                 
                 next_global_obs, next_private_obs = self.observation_wrapper(next_global_obs, next_private_obs)
-                # todo reward shaping
-                # if gov_reward < 0:
-                #     gov_reward = np.exp(gov_reward)
                 # store the episodes
                 self.buffer.add(global_obs, private_obs, gov_action, hou_action, gov_reward, house_reward,
                                 next_global_obs, next_private_obs, float(done))
@@ -318,7 +315,7 @@ class maddpg_agent:
 
                 step_count += 1
                 steps = 1
-                # 对 10%， 10～50%， 50%～100% 人群分组 找到三组的平均数据
+                # for 10%， 10～50%， 50%～100% households, compute mean value of 3 groups
                 total_income = np.mean(self.eval_env.post_income)
                 income_10 = np.mean(self.eval_env.post_income[sort_index[:10]])
                 income_50 = np.mean(self.eval_env.post_income[sort_index[10:50]])
@@ -418,7 +415,6 @@ class maddpg_agent:
                 # todo 统计数据
                 step_count += 1
                 
-                # 对 10%， 10～50%， 50%～100% 人群分组 找到三组的平均数据
                 maddpg_data[0].append(np.mean(self.eval_env.tax_array))
                 maddpg_data[1].append(np.mean(house_reward))
                 maddpg_data[2].append(self.eval_env.Lt)
@@ -441,14 +437,13 @@ class maddpg_agent:
                 global_obs = next_global_obs
                 private_obs = next_private_obs
             if step_count > 298:
-                # 指定要保存的文件名
+                
                 self.sav_list(str(self.model_path) + "/maddpg_episode_"+str(epoch_i)+".csv", maddpg_data)
                 self.sav_list(str(self.model_path) + "/random_episode_"+str(epoch_i)+".csv", random_data)
                 self.sav_list(str(self.model_path) + "/fixed_episode_"+str(epoch_i)+".csv", fixed_data)
 
     def sav_list(self, file_name, data_list):
         
-        # 打开CSV文件并将数据写入
         with open(file_name, mode='w', newline='') as file:
             writer = csv.writer(file)
             for row in data_list:
@@ -463,7 +458,7 @@ class maddpg_agent:
         n_global_obs = global_obs_tensor.repeat(self.envs.households.n_households, 1)
         obs = torch.cat([n_global_obs, private_obs_tensor],
                         dim=-1)
-        # 根据wealth 排序observation
+        
         sorted_indices = torch.argsort(obs[:, -1], descending=True)
         sorted_obs = obs[sorted_indices]
         num_set = range(0, self.envs.households.n_households)
@@ -477,7 +472,6 @@ class maddpg_agent:
             hou_action[num] = self.agents[i].select_action(sorted_obs[num], self.noise, self.epsilon)
         # temp = np.random.random((self.args.n_households, self.envs.households.action_space.shape[1]))
         # hou_action = temp * 2 - 1
-        # todo 按照原顺序指定 households actions
         house_sort_index = sorted_indices.cpu().numpy()
         hou_action = hou_action[np.argsort(house_sort_index)]
     

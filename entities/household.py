@@ -37,7 +37,7 @@ class Household(BaseEntity):
 
     def e_initial(self, n):
         self.e_array = np.zeros((n, 2))  # super-star and normal
-        # 全部初始化为normal
+        # initialize as normal state
         random_set = np.random.rand(n)
         self.e_array[:, 0] = (random_set > self.e_p).astype(int)
         self.e_array[:, 1] = (random_set < self.e_p).astype(int)
@@ -90,11 +90,7 @@ class Household(BaseEntity):
         self.at_init = self.initial_wealth_distribution()
 
     def lorenz_curve(self, wealths):
-        '''
-        lorenz_curve: https://zhuanlan.zhihu.com/p/400411387
-        '''
         f_vals, l_vals = qe.lorenz_curve(wealths)
-
         fig, ax = plt.subplots()
         ax.plot(f_vals, l_vals, label='Lorenz curve, lognormal sample')
         ax.plot(f_vals, f_vals, label='Lorenz curve, equality')
@@ -106,7 +102,7 @@ class Household(BaseEntity):
         return asset
 
     def get_real_data(self):
-        df = pd.read_csv('agents/cfg/scf2013.csv', header=None) # '/home/mqr/code/MARL/TaxAI/cfg/scf2013.csv'
+        df = pd.read_csv('agents/cfg/scf2013.csv', header=None)
         asset = df[3].values[1:].astype(np.float32)
         temp = np.unique(asset)[np.unique(asset)>0]
         return temp

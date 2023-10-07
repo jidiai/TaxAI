@@ -72,7 +72,7 @@ def _evaluate_agent(self):
     avg_wealth_gini = wealth_gini / self.args.eval_episodes
     return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, \
            avg_wealth_gini, mean_step
-# 获取类的参数
+
 def get_class_parameters(cls):
     parameters = {}
     for param_name, param_value in cls.__dict__.items():

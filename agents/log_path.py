@@ -1,6 +1,4 @@
-# -*- coding:utf-8  -*-
-# Time  : 2021/02/26 16:25
-# Author: Yutong Wu
+
 
 from pathlib import Path
 import os

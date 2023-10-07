@@ -155,9 +155,7 @@ class economic_society:
         # reward
         self.households_reward = self.utility_function(self.consumption, self.ht)
         self.government_reward = self.gov_reward()
-        # 如果gini>0.8, 有人破产， GDP过低 都会结束
-        # self.done = self.done or bool(self.wealth_gini > 0.9 or self.income_gini > 0.9 or math.isnan(self.government_reward) or
-        #                               math.isnan(np.mean(self.households_reward)) or np.min(self.households.at_next) < 0 or self.Bt_next < 0 or self.Kt_next < 0)
+        # terminal conditions: if gini>0.9; someone goes bankrupt; production capital < 0
         self.done = self.done or bool(self.wealth_gini > 0.9 or self.income_gini>0.9 or math.isnan(self.government_reward *self.wealth_gini * self.income_gini) or
                                       math.isnan(np.mean(self.households_reward)) or np.min(self.households.at_next) < 0 or self.Kt_next < 0)
 
@@ -177,13 +175,12 @@ class economic_society:
         return next_global_state, next_private_state, self.government_reward, self.households_reward, self.done
 
     def gov_reward(self):
-        '''人均GDP增长率 - weight * gini'''
+        '''capital GDP growth rate - weight * gini'''
         gov_goal = self.gov_task
         # gov_goal = "gini"
         if gov_goal == "gdp":
             return (self.per_household_gdp - self.old_per_gdp) / self.old_per_gdp
-            # return self.per_household_gdp/1e6
-            # return self.per_household_gdp
+           
         elif gov_goal == "gini":
             return - (self.wealth_gini * self.income_gini)
         elif gov_goal == "social_welfare":
@@ -352,7 +349,7 @@ class economic_society:
         pygame.draw.line(self.background, COLORS['blue'], (380,195), (280, 230), width=10)
 
         for event in pygame.event.get():
-            # 如果单击关闭窗口，则退出
+            
             if event.type == pygame.QUIT:
                 sys.exit()
         pygame.display.flip()

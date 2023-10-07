@@ -1,21 +1,16 @@
 import copy
 import numpy as np
 import torch
-import torch.nn.functional as F
-from torch import optim
 import os,sys
 import wandb
 import time
 sys.path.append(os.path.abspath('../..'))
 
-from agents.models import SharedAgent, SharedCritic, Actor, Critic
 from agents.log_path import make_logpath
-from utils.experience_replay import replay_buffer
-from agents.utils import get_action_info
 from datetime import datetime
 from tensorboardX import SummaryWriter
 from env.evaluation import save_parameters
-# os.environ["SDL_VIDEODRIVER"] = "directfb"
+
 import pygame
 torch.autograd.set_detect_anomaly(True)
 
@@ -44,8 +39,8 @@ class rule_agent:
         if self.wandb:
             wandb.init(
                 config=self.args,
-                project="AI_TaxingPolicy",
-                entity="ai_tax",
+                project="TaxAI",
+                entity="taxai",
                 name=self.model_path.parent.parent.name + "-" +self.model_path.name +'  n='+ str(self.args.n_households),
                 dir=str(self.model_path),
                 job_type="training",
@@ -58,8 +53,6 @@ class rule_agent:
         gov_rew = []
         house_rew = []
         epochs = []
-        wealth_stack = []
-        income_stack = []
         
         for epoch in range(1):
         # for epoch in range(self.args.n_epochs):

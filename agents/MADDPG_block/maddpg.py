@@ -5,7 +5,7 @@ import numpy as np
 import copy
 
 class MADDPG:
-    def __init__(self, args, agent_id):  # 因为不同的agent的obs、act维度可能不一样，所以神经网络不同,需要agent_id来区分
+    def __init__(self, args, agent_id):
         self.args = args
         self.agent_id = agent_id
         self.train_step = 0
@@ -64,12 +64,10 @@ class MADDPG:
             target_param.data.copy_((1 - self.args.tau) * target_param.data + self.args.tau * param.data)
     
     def households_obs_sort(self, private_obs):
-        # 根据wealth 排序observation
         sorted_indices = torch.argsort(private_obs[:,:,-1], descending=True)
         return sorted_indices
     
     # update the network
-    # todo 只优化三次network，每次用多个agent的batch data更新
     def train(self, transitions, other_agents):
         global_obs, private_obs, gov_action, hou_action, gov_reward, house_reward, next_global_obs, next_private_obs, done = transitions
         
@@ -88,8 +86,7 @@ class MADDPG:
         num.append(num_set[:int(0.1 * self.args.n_households)])
         num.append(num_set[int(0.1 * self.args.n_households):int(0.5 * self.args.n_households)])
         num.append(num_set[int(0.5 * self.args.n_households):])
-        # num.append(1)
-        # todo 给batch data 排序
+
         sorted_index = self.households_obs_sort(private_obses)
         private_obses = private_obses[np.arange(self.args.batch_size)[:, None], sorted_index]
         hou_actions = hou_actions[np.arange(self.args.batch_size)[:, None], sorted_index]
@@ -101,7 +98,7 @@ class MADDPG:
             r = gov_rewards.view(-1, 1)
         else:
             r = house_rewards[:, num[self.agent_id]]
-        # 用来装每个agent经验中的各项
+  
         o = torch.cat((private_obses.reshape(self.args.batch_size, -1), global_obses), dim=-1)
         u = torch.cat((hou_actions.reshape(self.args.batch_size, -1), gov_actions), dim=-1)
         n_next_global_obses = next_global_obses.unsqueeze(1).repeat(1, self.args.n_households, 1)
@@ -121,7 +118,6 @@ class MADDPG:
                 if agent_id == self.agent_id:
                     u_next.append(self.actor_target_network(this_next_o[agent_id]).reshape(self.args.batch_size, -1))
                 else:
-                    # 因为传入的other_agents要比总数少一个，可能中间某个agent是当前agent，不能遍历去选择动作
                     u_next.append(other_agents[index].actor_target_network(this_next_o[agent_id]).reshape(self.args.batch_size, -1))
                     index += 1
             u_next = torch.cat(u_next, dim=1)
@@ -143,7 +139,6 @@ class MADDPG:
         self.critic_optim.step()
 
         # the actor loss
-        # 重新选择联合动作中当前agent的动作，其他agent的动作不变
         new_house_actions = copy.copy(hou_actions)
         new_gov_actions = copy.copy(gov_actions)
         if self.agent_id == self.args.agent_block_num - 1:

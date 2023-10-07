@@ -71,8 +71,8 @@ class ippo_agent:
         save_args(path=self.model_path, args=self.args)
         wandb.init(
             config=self.args,
-            project="AI_TaxingPolicy",
-            entity="ai_tax",
+            project="TaxAI",
+            entity="taxai",
             name=self.model_path.parent.parent.name + "-" + self.model_path.name + '  n=' + str(self.args.n_households),
             dir=str(self.model_path),
             job_type="training",

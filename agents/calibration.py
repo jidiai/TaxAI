@@ -78,7 +78,7 @@ class calibration_agent:
             # 计算 h
             old_h = h
             h = self.calculate_h(W, e, I)
-            # print(h)  # 输出结果
+            # print(h)
             print("h max:", h.max(), "h min:", h.min())
             # self.envs.households.lorenz_curve(h)
 
