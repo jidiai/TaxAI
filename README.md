@@ -130,7 +130,7 @@ Based on reality, we set the government's objective to maximize the GDP growth r
 
 - **Maximizing Social Welfare**: Social welfare is an important indicator to present the happiness of the population, which is computed by the sum of all households' lifetime utility.
 
-- **Optimizing Multiple Tasks**: If the government aims to simultaneously optimize multiple objectives, we weigh and sum up multiple objectives. The weights $\omega_1$, $\omega_2$ indicate the relative importance of gini and welfare objectives.
+- **Optimizing Multiple Tasks**: If the government aims to simultaneously optimize multiple objectives, we weigh and sum up multiple objectives. 
 
 ### Supported algorithms
 
@@ -194,59 +194,131 @@ python main.py --n_households 10 --alg "bmfac" --task "gdp_gini" --seed 2 --hidd
 
 
 5. Train HARL/MAPPO agents.
-   (to add)
+Details is shown in TaxAI/HARL/README.md
 
 
+## TaxAI Simulator
 
-## Markov Game
+### Partially Observable Markov Games
 
 <div style="text-align:center">
   <img src="./img/markov games flow.jpg" alt="示例图片" width=80%>
   <figcaption style="text-align:center;"></figcaption>
 </div>
 
-The Markov game between the government and household agents. In the center of the figure, we display the Lorenz curves of households' wealth distribution.  The global observation consists of the average assets $\bar{a}_t$, income $\bar{i}_t$, and productivity level $\bar{e}_t$ of the 50\% poorest households and 10\% richest households, along with the wage rate $W_t$. For the government agent, it observes the global observation and takes tax and spending actions $\{\tau_t, \xi_t, \tau_{a,t}, \xi_{a,t}, r^G_t\}$ through the actor network. For household agents, they observe both global and private observation, including personal assets $\{a^i_t\}$ and productivity level $\{e^i_t\}$, and generate savings and workings actions $\{p^i_t, h^i_t\}$ through the actor network. The actor network structure in the figure is just an example.
+We model the problem of optimizing tax policies for the government and developing saving and working strategies for households as multiplayer general-sum Partially Observable Markov Games (POMGs).
 
+
+- Global information: the average assets $\bar{a}_t$, income $\bar{i}_t$, and productivity level $\bar{e}_t$ of the 50\% poorest households and 10\% richest households, along with the wage rate $W_t$.
+
+- Private information: household's personal assets $\{a^i_t\}$ and productivity level $\{e^i_t\}$.
+
+#### Government agent:
+- Government observation: global information
+
+- Govornment action: takes tax and spending actions $\{\tau_t, \xi_t, \tau_{a,t}, \xi_{a,t}, r^G_t\}$.
+
+#### Household agent:
+- Household observation: global + private information
+- Household action: savings and workings actions $\{p^i_t, h^i_t\}$.
+
+### Key Improvements 
+
+1. To bridge the gap between economic models and the real world, we opt to calibrate TaxAI using [2013 SCF data](https://www.federalreserve.gov/econres/scf_2013.htm).
+2. To mitigate the curse of dimensionality associated with high-dimensional state information, we draw inspiration from [the World Inequality Report 2022](https://wir2022.wid.world/) and employ grouped statistical averages for households as a representation of this high-dimensional state information.
+3. In response to the abundance of constraints, we introduce the concept of proportional actions, facilitating control over the range of actions to adhere to these constraints.
+
+### Economic Assumption
+- Social roles, such as households and government, are considered rational agents.
+- Households are not allowed to incur debt and engage only in risk-free investments.
+- The labor productivity of households is categorized into two states: normal state and super-star state. The dynamic changes in each state follow an AR(1) process.
+- The capital market, goods market, and labor market clear.
+- The technology firm represents all enterprises and factories, producing a homogeneous good, and follows the Cobb-Douglas production function.
+- The financial Intermediary operates without arbitrage.
+
+### Teriminal Conditions
+We will terminate the current episode under the following circumstances:
+- If the maximum number of steps in an episode is reached.
+- If the Gini coefficient of income or wealth exceeds a threshold;
+- If the Gross Domestic Product (GDP) is insufficient to cover the total consumption of households (C_t + G_t > Y_t).
+- In the event of household bankruptcy (a_t^i < 0).
+- If the calculation of households' or government's rewards results in an overflow or leads to the appearance of NaN (Not-a-Number) values. 
+
+### Timing Tests
+
+The following table shows the number of dynamics evaluations per second in a single thread.
+Results are averaged over 10 episodes on AMD EPYC 7742 64-Core Processor with GPU GA100 [GRID A100 PCIe 40GB].
+
+|Algorithm | N=10 |  N=100 |  N=1000 |  N=10000 |  
+|------|-----|-----|-----|-----|
+|Number of steps  |1799.927|482.335|46.983|4.018|
+|num of episodes  |6.289|1.689|0.157|0.013|
+|episode length  |285.900|285.400|300.000|300.000|
 
 
 ## Experiment Results
 
-### 1. Optimal Solution in Dynamic Game
+### 1. Comparative Analysis of Multiple Baselines
+We benchmark 9 baselines on 4 distinct tasks, with the training curves and test results of macroeconomic indicators shown as follows.
 
+- Macroeconomic Perspectives: Different algorithms also differ in terms of convergence solutions.
 <div style="text-align:center">
-  <img src="./img/results.jpg" alt="示例图片" width=100%>
+  <img src="./img/full_training_curves.png" alt="示例图片" width=100%>
   <figcaption style="text-align:center;"></figcaption>
 </div>
 
-### 2. Households Dynamic Responses
+|Baselines |Years| Average social welfare|Per capital GDP | Wealth gini |Income gini|
+|------| ------| ------| ------| ------| -----|
+|Free market| 1.0 | 2.9 | 4.3e6 | 0.79 |**0.39**|
+|GA| 200.0 | 6.9 | 1.2e7 |   0.54 | 0.52 |
+|IPPO| 162.7 | 1035.5 | 8.4e6 |0.62 | 0.44 |
+|MADDPG| 204.2 | 1344.6 | 1.0e6 |0.61| 0.58 |
+|MAPPO| 274.5 | 3334.7 | 7.3e6  | 0.61 | 0.65 |
+|HAPPO| 298.7 | 1986.0  |  1.6e7 |  0.52 | 0.54 |
+|HATRPO| **300.0**|  1945.0 | **1.7e7**  | 0.52 |  0.54|
+|HAA2C| **300.0** | 2113.3 | 1.4e7  | 0.51| 0.53 |
+|BMFAC|292.8 | **3722.2**  | 2.8e6  |  **0.48**| 0.50 |
 
+
+- Microeconomic Perspectives: MADDPG households exhibit tax evasion behavior and attain the highest utility.
 <div style="text-align:center">
-  <img src="./img/tax_action.jpg" alt="示例图片" width=100%>
+  <img src="./img/micro_bhv.png" alt="示例图片" width=100%>
   <figcaption style="text-align:center;"></figcaption>
 </div>
 
-### 3. Scalability of Environment
 
-<div style="text-align:center">
-  <img src="./img/scalability.png" alt="示例图片" width=80%>
-  <figcaption style="text-align:center;"></figcaption>
-</div>
 
-### 4. AI-based Policy Analysis
-
+### 2. Economic Analysis of MARL Policy
+1. MADDPG converges towards the highest GDP while compromising social welfare under maximizing GDP task;
+2. Different wealth groups adopt distinct strategies.
 <div style="text-align:center">
   <img src="./img/maddpg_indicators.jpg" alt="示例图片" width=100%>
   <figcaption style="text-align:center;"></figcaption>
 </div>
 
+|Households’ groups  | Income tax | Wealth tax | Total tax | Labor supply  | Consumption | Wealth | Income  | Per year utility |
+|-----|-----|----|----|----|----|----|----|----|
+|The wealthy        | 1.9 e6   | **1.0e7**    | **1.2e7**   | 2.3e6      | **4.4e7**     | **5.3e7** | 5.5 e6  | **8.7**    |
+|The middle class   | **5.7 e6**   | 3.0 e6   | 8.7e6   | **7.1e6**      | 6.4e5     | 2.1e7 | **7.2 e6**  | -24.1   |
+|The poor           | 2.8 e6   | 1.2e6    | 4.0e6   | 4.9e6      | 2.3e5     | 9.2e6 | 4.6 e 6 | -25.6      |
+|Mean value         | 3.8 e6   | 2.9 e6   | 6.7e6   | 5.5e6      | 4.8e6     | 1.8e7 | 5.7 e 6 | -22.7     |
 
 
-### 5. Training Curves
+### 3. Scalability of Environment
 
-<div style="text-align:center">
-  <img src="./img/training_curves.jpg" alt="示例图片" width=100%>
-  <figcaption style="text-align:center;"></figcaption>
-</div>
+|Algorithm | N=10      | N=100     | N=1000    | N=10000   |
+|--------|-----------|-----------|-----------|-----------|
+|Free Market  | 1.3e6     | 4.3e6     | 3.9e6     | 4.0e6     |
+|GA| **1.7e8** | 1.5e7     | NA        | NA        |
+|IPPO  | 5.0e6     | 1.6e7     | 1.7e7     | 1.6e7     |
+|MADDPG   | 3.2e6     | 1.1e7     | 1.7e7     | **1.7e7** |
+|MAPPO | 6.1e6     | 7.3e6     | 1.2e7     | NA        |
+|HAPPO | 1.8e7     | 1.6e7     | 1.5e7     | NA        |
+|HATRPO | 3.2e7     | **1.7e7** | **2.0e7** | NA        |
+|HAA2C  | 1.6e7     | 1.4e7     | 1.6e7     | NA        |
+|BMFAC   | 4.0e6     | 1.2e7     | 1.2e7     | NA        |
+
+
 
 ## Acknowledgement
 
