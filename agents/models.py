@@ -2,6 +2,23 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class CloneModel(nn.Module):
+    def __init__(self, input_size, output_size, hidden_size=64):
+        super(CloneModel, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.relu = nn.ReLU()
+        self.fc_mean = nn.Linear(hidden_size, output_size)
+        self.fc_std = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
+        mean = F.sigmoid(self.fc_mean(x))  # Apply sigmoid activation
+        log_std = torch.clamp(self.fc_std(x), min=-20, max=2)
+        std = torch.exp(log_std)  # Ensure std is positive
+        return mean, std
+
 class Critic(nn.Module):
     def __init__(self, input_dims, hidden_size, action_dims=None):
         super(Critic, self).__init__()

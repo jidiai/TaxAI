@@ -1,5 +1,4 @@
 import numpy as np
-
 from env.env_core import economic_society
 from agents.baseline import agent
 from agents.rule_based import rule_agent
@@ -8,6 +7,7 @@ from agents.calibration import calibration_agent
 from agents.BMFAC import BMFAC_agent
 from agents.MADDPG_block.MAAC import maddpg_agent
 from agents.ppo.ppo_agent import ppo_agent
+from agents.real_data.real_data import real_agent
 from utils.seeds import set_seeds
 import os
 import argparse
@@ -69,12 +69,14 @@ if __name__ == '__main__':
         trainer = BMFAC_agent(env, yaml_cfg.Trainer)
     elif args.alg == "maddpg":
         trainer = maddpg_agent(env, yaml_cfg.Trainer)
+    elif args.alg == "real":
+        trainer = real_agent(env, yaml_cfg.Trainer)
     else:
         trainer = calibration_agent(env, yaml_cfg.Trainer)
     # start to learn
     print("n_households: ", yaml_cfg.Trainer["n_households"])
     trainer.learn()
-    trainer.test()
+    # trainer.test()
     # # close the environment
     # env.close()
 

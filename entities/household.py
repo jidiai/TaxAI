@@ -27,7 +27,7 @@ class Household(BaseEntity):
 
         self.action_dim = entity_args['action_shape']
 
-        self.real_asset = self.get_real_data()
+        self.real_asset, self.real_e = self.get_real_data()
         self.households_init()
         self.reset()
         self.action_space = Box(
@@ -39,7 +39,7 @@ class Household(BaseEntity):
         self.e_array = np.zeros((n, 2))  # super-star and normal
         # initialize as normal state
         random_set = np.random.rand(n)
-        self.e_array[:, 0] = (random_set > self.e_p).astype(int)
+        self.e_array[:, 0] = (random_set > self.e_p).astype(int) * self.e_init.flatten()
         self.e_array[:, 1] = (random_set < self.e_p).astype(int)
         self.e = np.sum(self.e_array, axis=1, keepdims=True)
         
@@ -86,8 +86,9 @@ class Household(BaseEntity):
         
 
     def households_init(self):
+        self.at_init,self.e_init = self.sample_real_data()
         self.e_initial(self.n_households)
-        self.at_init = self.initial_wealth_distribution()
+
 
     def lorenz_curve(self, wealths):
         f_vals, l_vals = qe.lorenz_curve(wealths)
@@ -97,20 +98,16 @@ class Household(BaseEntity):
         ax.legend()
         plt.show()
 
-    def initial_wealth_distribution(self):  # 大部分国家财富分布遵循 pareto distribution
-        asset = self.sample_real_data()
-        return asset
-
     def get_real_data(self):
-        df = pd.read_csv('agents/cfg/scf2013.csv', header=None)
-        asset = df[3].values[1:].astype(np.float32)
-        temp = np.unique(asset)[np.unique(asset)>0]
-        return temp
+        df = pd.read_csv('agents/data/advanced_scfp2022.csv')
+        asset = df['ASSET'].values
+        educ = df['EDUC'].values
+        return asset,educ
     def sample_real_data(self):
-        # index = [random.randint(0, len(self.real_asset) - 1) for _ in range(self.n_households)]
         index = np.random.choice(range(0, len(self.real_asset) - 1), self.n_households, replace=False)
         batch_asset = self.real_asset[index]
-        return batch_asset.reshape(self.n_households, 1)
+        batch_e = self.real_e[index]
+        return batch_asset.reshape(self.n_households, 1), batch_e.reshape(self.n_households, 1)
     
     def close(self):
         pass

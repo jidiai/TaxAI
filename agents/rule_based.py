@@ -35,7 +35,7 @@ class rule_agent:
 
         self.model_path, _ = make_logpath(algo="rule_based",n=self.args.n_households)
         save_args(path=self.model_path, args=self.args)
-        self.wandb = True
+        self.wandb = False
         if self.wandb:
             wandb.init(
                 config=self.args,
@@ -54,7 +54,7 @@ class rule_agent:
         house_rew = []
         epochs = []
         
-        for epoch in range(1):
+        for epoch in range(10):
         # for epoch in range(self.args.n_epochs):
 
             if epoch % self.args.display_interval == 0:
@@ -170,8 +170,8 @@ class rule_agent:
         return avg_gov_reward, avg_house_reward, avg_mean_tax, avg_mean_wealth, avg_mean_post_income, avg_gdp, avg_income_gini, \
                avg_wealth_gini, mean_step
     def _evaluate_get_action(self, global_obs, private_obs):
-        # gov_action = np.array([0.5, 0.01, 0.5, 0.01, 0.189/0.5])
-        gov_action = np.array([0, 0., 0, 0, 0/0.5])
+        gov_action = np.array([0.23, 0.01, 0.5, 0.01, 0.189/0.5])
+        # gov_action = np.array([0, 0., 0, 0, 0/0.5])
         # gov_action = np.random.random(5)
         
         temp = np.random.random((self.args.n_households, self.envs.households.action_space.shape[1]))

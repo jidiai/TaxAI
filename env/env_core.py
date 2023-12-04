@@ -249,13 +249,13 @@ class economic_society:
     def utility_function(self, c_t, h_t):
         # life-time CRRA utility
         if 1-self.households.CRRA == 0:
-            u_c = np.log(c_t)  # u_c \in (9,20)
+            u_c = np.log(c_t/1000)  # u_c \in (9,20)
         else:
             u_c = c_t ** (1 - self.households.CRRA) / (1 - self.households.CRRA)
         if 1 + self.households.IFE == 0:
             u_h = np.log(h_t)
         else:
-            u_h = ((5*self.workingHours)**(1 + self.households.IFE)/(1 + self.households.IFE))
+            u_h = 10*((self.workingHours)**(1 + self.households.IFE)/(1 + self.households.IFE))
         current_utility = u_c - u_h
         return current_utility
 
