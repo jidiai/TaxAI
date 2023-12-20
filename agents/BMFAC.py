@@ -78,7 +78,7 @@ class BMFAC_agent:
         save_args(path=self.model_path, args=self.args)
         
         self.fix_gov = True
-        self.wandb = True
+        self.wandb = False
         if self.wandb:
             wandb.init(
                 config=self.args,

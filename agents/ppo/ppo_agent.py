@@ -41,11 +41,11 @@ class ppo_agent:
         
         self.model_path, _ = make_logpath(algo="ppo",n=self.args.n_households)
         save_args(path=self.model_path, args=self.args)
-        self.wandb = True
+        self.wandb = False
         if self.wandb == True:
             wandb.init(
                 config=self.args,
-                project="TaxAI",
+                project="TaxAI",  # please update as your project
                 entity="taxai",
                 name=self.model_path.parent.parent.name + "-" + self.model_path.name + '  n=' + str(self.args.n_households),
                 dir=str(self.model_path),

@@ -51,7 +51,6 @@ class maddpg_agent:
         self.model_path, _ = make_logpath(algo="maddpg",n=self.args.n_households)
         save_args(path=self.model_path, args=self.args)
         self.fix_gov = True
-        # todo add new names
         self.indicators_name = ["gov_reward", "mean_utility", "years", "total_income", "income_10", "income_50",
                                 "income_100", "total_tax", "income_tax", "income_tax_10", "income_tax_50",
                                 "income_tax_100", "total_wealth", "wealth_10", "wealth_50", "wealth_100", "wealth_tax",
@@ -60,7 +59,7 @@ class maddpg_agent:
                                 "labor_100", "sw_10", "sw_50", "sw_100",
                                 "total_consumption", "consumption_10", "consumption_50", "consumption_100", "Bt", "Kt","Gt_prob", "income_tau", "income_xi", "wealth_tau", "wealth_xi"]
         
-        self.wandb = True
+        self.wandb = False
         if self.wandb:
             wandb.init(
                 config=self.args,
