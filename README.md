@@ -219,6 +219,11 @@ We model the problem of optimizing tax policies for the government and developin
 - Govornment action: takes tax and spending actions $\{\tau_t, \xi_t, \tau_{a,t}, \xi_{a,t}, r^G_t\}$.
 
 #### Household agent:
+*UPDATE!*
+Household's Reward Function:
+$$
+r_f^i =\text{Sigmoid}(\frac{{c_t^i}^{1-\theta}}{1-\theta}-\frac{{h_t^i}^{1+\gamma}}{1+\gamma})
+$$
 - Household observation: global + private information
 - Household action: savings and workings actions $\{p^i_t, h^i_t\}$.
 
