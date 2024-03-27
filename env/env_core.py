@@ -257,7 +257,10 @@ class economic_society:
         else:
             u_h = 10*((self.workingHours)**(1 + self.households.IFE)/(1 + self.households.IFE))
         current_utility = u_c - u_h
-        return current_utility
+        return self.sigmoid(current_utility)
+        
+    def sigmoid(self, x):
+        return 1 / (1 + np.exp(-x))
 
     def gini_coef(self, wealths):
         cum_wealths = np.cumsum(sorted(np.append(wealths, 0)))
